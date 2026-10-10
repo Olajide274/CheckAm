@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import Link from "next/link";
 import { CheckAmLogo } from "@/components/checkam-logo";
 import { isValidImei } from "@/lib/imei";
 import { trackEvent } from "@/lib/track-event";
@@ -86,7 +85,6 @@ export default function Home() {
         <div className="header-inner">
           <CheckAmLogo />
           <div className="header-actions">
-            <Link className="header-login-link" href="/login">Log in</Link>
             <a className="header-link" href="#waitlist">
               Get early access <span aria-hidden="true">↗</span>
             </a>

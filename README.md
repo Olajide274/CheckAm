@@ -17,6 +17,8 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) and
 [the SMS provider decision](docs/decisions/0001-defer-sms-provider.md).
 The IMEI check validates input format only; it does not check a device registry.
 The ₦500 button records interest and does not take payment.
+The public `/login` and `/app` routes show a Coming soon page. The OTP
+implementation remains in the repository but is not exposed on the public site.
 
 ## Local development
 

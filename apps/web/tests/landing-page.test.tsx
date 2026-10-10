@@ -15,6 +15,7 @@ describe("landing page", () => {
     );
     render(<Home />);
 
+    expect(document.querySelector('a[href="/login"], a[href="/app"]')).toBeNull();
     fireEvent.change(screen.getByLabelText("Phone IMEI"), {
       target: { value: "490154203237518" },
     });
