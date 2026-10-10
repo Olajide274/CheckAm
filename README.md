@@ -1,47 +1,77 @@
 # CheckAm
 
-CheckAm is a Nigerian before-you-pay device check for phones and laptops. Buyers can check an IMEI or serial number before paying, sellers can prove ownership, and owners can register devices and report them lost or stolen.
+CheckAm is a Nigerian before-you-pay device-check project for phones and
+laptops. The repository currently contains a mobile-first landing page with an
+IMEI format check, a PostgreSQL-backed waitlist and basic analytics, plus an
+ASP.NET Core API foundation.
 
-## Overview
+## Current roadmap status
 
-This repository contains the foundation for the product:
+- Steps 0 and 2: DONE.
+- Step 1: CURRENT — deploy the landing page and demand test.
+- Step 3: BLOCKED — the phone OTP flow exists, but a production SMS sender is
+  deferred until a provider is chosen.
+- Steps 4–11: TODO.
 
-- a Next.js web app for the public check and waitlist experience
-- an ASP.NET Core API with layered architecture for domain, application, infrastructure, and API concerns
-- PostgreSQL and Redis services for local development via Docker Compose
-- GitHub Actions CI to build and test both app stacks on every pull request
+See [docs/ROADMAP.md](docs/ROADMAP.md) and
+[the SMS provider decision](docs/decisions/0001-defer-sms-provider.md).
+The IMEI check validates input format only; it does not check a device registry.
+The ₦500 button records interest and does not take payment.
+The public `/login` and `/app` routes show a Coming soon page. The OTP
+implementation remains in the repository but is not exposed on the public site.
 
-## Local setup
+## Local development
 
-### Prerequisites
+Prerequisites: Node.js 20+, .NET 8 SDK, and Docker Compose.
 
-- Node.js 20+
-- .NET 8 SDK
-- Docker Desktop or Docker Engine with Compose
+Start PostgreSQL:
 
-### Start dependencies
-
-```bash
-docker compose up -d
+```sh
+docker compose up -d postgres
 ```
 
-### Run the web app
+Run the web app from `apps/web` with a PostgreSQL `DATABASE_URL`:
 
-```bash
-cd apps/web
-npm install
-npm run dev
+```sh
+npm ci
+DATABASE_URL='postgresql://postgres:postgres@localhost:5432/checkam' npm run dev
 ```
 
-### Run the API
+Run the API from `apps/api` after setting
+`ConnectionStrings__DefaultConnection` and `Auth__OtpHashKey` in environment
+configuration or .NET user secrets. The OTP hash key must be base64-encoded and
+contain at least 32 random bytes. Apply schema changes with
+`./scripts/apply-migrations.sh`. Development OTP logging is disabled unless
+`Auth__DevelopmentLogOtp=true` is explicitly set; it is rejected outside
+Development and does not send a message.
 
-```bash
-cd apps/api
-dotnet restore
-dotnet build
-dotnet run --project CheckAm.Api
-```
+## Deploy the landing page
 
-## Project status
+1. Create a Vercel project from this repository and set its Root Directory to
+   `apps/web`.
+2. Provision a managed PostgreSQL database reachable from Vercel (for example,
+   through a Vercel integration or an external PostgreSQL provider). Use a
+   separate database for production and preview environments where practical.
+3. Set `DATABASE_URL` in the Vercel project environment variables to that
+   database's PostgreSQL connection URI. Use the provider's serverless/pooling
+   connection URI where it supplies one; the database role must be able to
+   create and write the app's tables.
+4. Deploy. The web app creates its `waitlist_signups` and `analytics_events`
+   tables on the first waitlist or analytics request; no API EF migration is
+   needed for these web tables. Verify the landing page, submit a test signup,
+   and confirm the analytics and signup records in the database.
 
-This repository is currently in Step 0: repository and tooling setup. The next step is the landing page and demand test.
+`DATABASE_URL` is required for waitlist submissions and analytics. The public
+landing page can render without it, but those persistence requests will fail
+until it is configured.
+
+`CHECKAM_API_URL` is only needed if a separately hosted API is configured for
+the web app's `/api/auth/*` proxy. Production phone sign-in is not ready: no
+production SMS sender has been selected or implemented. Do not enable
+`Auth__DevelopmentLogOtp` outside Development.
+
+## Tests
+
+Web tests run from `apps/web` with `npm test`; API tests run from `apps/api`
+with `dotnet test CheckAm.sln`. CI starts PostgreSQL, applies EF Core migrations,
+and runs the API tests against that database service.

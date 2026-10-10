@@ -1,4 +1,8 @@
 using CheckAm.Application.Auth;
+using CheckAm.Infrastructure;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace CheckAm.Api.Tests;
@@ -127,6 +131,74 @@ public sealed class PhoneAuthServiceTests
         Assert.Equal(OtpVerificationStatus.RateLimited, limited.Status);
     }
 
+    [Fact]
+    public async Task Development_sender_does_not_log_phone_numbers_or_otp_codes()
+    {
+        const string phoneNumber = "+2348012345678";
+        const string code = "123456";
+        var loggerProvider = new CapturingLoggerProvider();
+        var configuration = CreateInfrastructureConfiguration();
+        var services = new ServiceCollection();
+        services.AddLogging(logging => logging.AddProvider(loggerProvider));
+        services.AddInfrastructure(configuration, isDevelopment: true);
+        using var provider = services.BuildServiceProvider();
+        var sender = provider.GetRequiredService<IOtpSender>();
+
+        await sender.SendAsync(phoneNumber, code, CancellationToken.None);
+
+        var log = Assert.Single(loggerProvider.Messages);
+        Assert.Contains("delivery is disabled", log);
+        Assert.DoesNotContain(phoneNumber, log);
+        Assert.DoesNotContain(code, log);
+    }
+
+    [Fact]
+    public async Task Development_sender_logs_only_the_code_when_opted_in()
+    {
+        const string phoneNumber = "+2348012345678";
+        const string code = "123456";
+        var loggerProvider = new CapturingLoggerProvider();
+        var services = new ServiceCollection();
+        services.AddLogging(logging => logging.AddProvider(loggerProvider));
+        services.AddInfrastructure(
+            CreateInfrastructureConfiguration("true"),
+            isDevelopment: true);
+        using var provider = services.BuildServiceProvider();
+        var sender = provider.GetRequiredService<IOtpSender>();
+
+        await sender.SendAsync(phoneNumber, code, CancellationToken.None);
+
+        var log = Assert.Single(loggerProvider.Messages);
+        Assert.Contains(code, log);
+        Assert.DoesNotContain(phoneNumber, log);
+    }
+
+    [Fact]
+    public void Development_sender_is_not_registered_outside_development()
+    {
+        var services = new ServiceCollection();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => services.AddInfrastructure(
+                CreateInfrastructureConfiguration(),
+                isDevelopment: false));
+
+        Assert.Contains("SMS provider is not supported", exception.Message);
+    }
+
+    [Fact]
+    public void Development_otp_logging_cannot_be_enabled_outside_development()
+    {
+        var services = new ServiceCollection();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => services.AddInfrastructure(
+                CreateInfrastructureConfiguration("true"),
+                isDevelopment: false));
+
+        Assert.Contains("only be enabled in the Development environment", exception.Message);
+    }
+
     private static PhoneAuthService CreateService(
         FakePhoneAuthStore store,
         CapturingOtpSender sender,
@@ -136,6 +208,43 @@ public sealed class PhoneAuthServiceTests
             sender,
             new byte[32],
             clock ?? new TestTimeProvider(Now));
+
+    private static IConfiguration CreateInfrastructureConfiguration(string? logOtp = null) =>
+        new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:DefaultConnection"] =
+                    "Host=localhost;Database=checkam;Username=postgres;Password=test",
+                ["Auth:DevelopmentLogOtp"] = logOtp
+            })
+            .Build();
+
+    private sealed class CapturingLoggerProvider : ILoggerProvider
+    {
+        public List<string> Messages { get; } = [];
+
+        public ILogger CreateLogger(string categoryName) => new CapturingLogger(Messages);
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class CapturingLogger(List<string> messages) : ILogger
+    {
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter) =>
+            messages.Add(formatter(state, exception));
+    }
 
     private sealed class CapturingOtpSender : IOtpSender
     {

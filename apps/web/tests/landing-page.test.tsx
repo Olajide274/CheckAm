@@ -1,11 +1,57 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import Home from "@/app/page";
+
+const originalMatchMedia = Object.getOwnPropertyDescriptor(window, "matchMedia");
 
 describe("landing page", () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    vi.useRealTimers();
+    if (originalMatchMedia) {
+      Object.defineProperty(window, "matchMedia", originalMatchMedia);
+    } else {
+      Reflect.deleteProperty(window, "matchMedia");
+    }
+  });
+
+  it("keeps a static accessible headline label", () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }))),
+    );
+    Object.defineProperty(window, "matchMedia", { configurable: true, value: () => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }) });
+    render(<Home />);
+
+    expect(screen.getByRole("heading", { name: "Check a phone before you pay." }).getAttribute("aria-label"))
+      .toBe("Check a phone before you pay.");
+    expect(document.querySelector(".headline-device")?.getAttribute("aria-hidden"))
+      .toBe("true");
+  });
+
+  it("keeps the phone headline when reduced motion is preferred", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }))),
+    );
+    Object.defineProperty(window, "matchMedia", { configurable: true, value: () => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }) });
+    render(<Home />);
+
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+
+    expect(document.querySelector(".headline-device-word")?.textContent).toBe("phone");
   });
 
   it("shows the format-only result after a valid IMEI is submitted", async () => {
@@ -15,6 +61,7 @@ describe("landing page", () => {
     );
     render(<Home />);
 
+    expect(document.querySelector('a[href="/login"], a[href="/app"]')).toBeNull();
     fireEvent.change(screen.getByLabelText("Phone IMEI"), {
       target: { value: "490154203237518" },
     });

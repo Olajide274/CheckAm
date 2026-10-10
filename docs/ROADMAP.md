@@ -2,19 +2,20 @@
 
 Rule: one step at a time. Only the CURRENT step may be built. A step is DONE only when every "Done when" item is true.
 
-Status key: CURRENT, TODO, DONE
+Status key: CURRENT, TODO, BLOCKED, DONE
 
 ## Step 0: Repo and tooling (DONE)
 Done when: README explains the project; folders exist; docker-compose runs PostgreSQL and Redis; an empty Next.js app and an empty ASP.NET Core solution (four layered projects plus a test project) both build; a GitHub Actions workflow builds and tests both apps on every pull request; .editorconfig and .gitignore are in place.
 
-## Step 1: Landing page and demand test (DONE)
+## Step 1: Landing page deployment (CURRENT)
 Done when: a fast, mobile-first landing page with the CheckAm logo; a "Check a phone before you buy" input that validates IMEI format only; a waitlist form saving to PostgreSQL; a "Get the full report, N500" button that only records clicks; a one-question sign-up ("which feature would you use most?"); basic analytics events; deployed.
 
 ## Step 2: API foundation (DONE)
 Done when: health endpoint; global error handling; structured logging; rate limiting; migrations run in CI; OpenAPI docs.
 
-## Step 3: Phone OTP login (CURRENT)
+## Step 3: Phone OTP login (BLOCKED)
 Done when: OTP request and verify with throttling, sessions, and tests.
+Blocked because: "Phone OTP flow is implemented and tested; a production SMS sender is deferred until a provider is chosen."
 
 ## Step 4: Device registration (TODO)
 Done when: register a device (IMEI or serial, photos, receipt upload); IMEI validity check; model-match lookup behind an interface; duplicate registrations blocked.

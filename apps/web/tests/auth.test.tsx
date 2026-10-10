@@ -1,7 +1,6 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import AppHomePage from "@/app/app/page";
 import { POST as authProxyPost } from "@/app/api/auth/[...segments]/route";
 import { LoginForm } from "@/components/login-form";
 
@@ -27,7 +26,7 @@ describe("phone login", () => {
     vi.unstubAllGlobals();
   });
 
-  it("requests an OTP, verifies it, and enters the app shell", async () => {
+  it("requests and verifies an OTP before navigating to the app route", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ message: "sent" }), { status: 202 }))
@@ -89,57 +88,6 @@ describe("phone login", () => {
     expect((await screen.findByRole("alert")).textContent).toContain(
       "Wait a little before requesting another code.",
     );
-  });
-});
-
-describe("app shell", () => {
-  beforeEach(() => {
-    router.replace.mockReset();
-    router.refresh.mockReset();
-  });
-
-  afterEach(() => {
-    cleanup();
-    vi.unstubAllGlobals();
-  });
-
-  it("shows the four product tabs after confirming the session", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ authenticated: true }), { status: 200 }),
-      ),
-    );
-    render(<AppHomePage />);
-
-    expect(await screen.findByRole("heading", { name: "Welcome to CheckAm" })).toBeDefined();
-    expect(screen.getByRole("link", { name: /Check a phone/ })).toBeDefined();
-    const navigation = screen.getByRole("navigation", { name: "Main navigation" });
-    expect(within(navigation).getAllByRole("button").map((button) => button.textContent)).toEqual([
-      "Check",
-      "My Devices",
-      "History",
-      "Account",
-    ]);
-
-    fireEvent.click(within(navigation).getByRole("button", { name: "History" }));
-    expect(screen.getByRole("heading", { name: "History" })).toBeDefined();
-    expect(screen.getByText("Coming soon.")).toBeDefined();
-  });
-
-  it("redirects to login when there is no valid session", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({ title: "Sign-in required" }),
-          { status: 401 },
-        ),
-      ),
-    );
-    render(<AppHomePage />);
-
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/login"));
   });
 });
 
