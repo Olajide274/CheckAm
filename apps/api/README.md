@@ -54,19 +54,25 @@ used to HMAC OTP codes, phone/IP rate-limit keys, and session tokens. Run
 `dotnet user-secrets set "Auth:OtpHashKey" "<base64-encoded random key>" --project CheckAm.Api`
 for local development.
 
-In Development, the API uses a console OTP sender. The six-digit code is written
-to the API log and expires after five minutes; it can be used once and allows
-at most five attempts. OTP requests are limited to three per phone number and
-ten per IP address in each ten-minute window. These limits and active sessions
-are stored in PostgreSQL. Use
+In Development, the configured OTP sender does not deliver codes; it logs only
+that delivery is disabled and never logs the phone number or OTP. Codes expire
+after five minutes, can be used once, and allow at most five attempts. OTP
+requests are limited to three per phone number and ten per IP address in each
+ten-minute window. These limits and active sessions are stored in PostgreSQL. Use
 `Auth__CookieDomain` only when the API and web app need to share a parent-domain
 cookie; leave it unset for local development.
+
+To inspect a Development OTP locally, explicitly set
+`Auth__DevelopmentLogOtp=true`. This setting defaults to false and the API
+refuses to start if it is enabled outside Development. The opt-in logs the code
+but not the phone number; it does not send an SMS.
 
 The session cookie is HttpOnly, SameSite=Lax, and Secure for Production or HTTPS
 requests. Sessions expire after 30 days. The web app proxies these endpoints
 through `/api/auth/*`; set `CHECKAM_API_URL` in the web process to the API origin
 (for example `http://localhost:5155`).
 
-`IOtpSender` is the provider boundary. This repository includes only the
-Development console sender; other environments fail startup until a production
-SMS sender is configured in code. No OTP is returned in an HTTP response.
+`IOtpSender` is the provider boundary. This repository includes only a
+Development-only, non-delivering sender; other environments fail startup until
+a production SMS sender is implemented and configured. No OTP is returned in
+an HTTP response.

@@ -31,6 +31,23 @@ jobs:
 
   api:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: checkam
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d checkam"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      ConnectionStrings__DefaultConnection: Host=localhost;Port=5432;Database=checkam;Username=postgres;Password=postgres
+      Auth__OtpHashKey: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
     defaults:
       run:
         working-directory: apps/api
@@ -48,6 +65,11 @@ jobs:
 
       - name: Build API solution
         run: dotnet build CheckAm.sln --no-restore --verbosity minimal
+
+      - name: Apply database migrations
+        run: ./scripts/apply-migrations.sh
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
 
       - name: Run API tests
         run: dotnet test CheckAm.sln --no-build --verbosity normal
