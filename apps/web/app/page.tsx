@@ -5,6 +5,8 @@ import { CheckAmLogo } from "@/components/checkam-logo";
 import { isValidImei } from "@/lib/imei";
 import { trackEvent } from "@/lib/track-event";
 
+const devices = ["phone", "laptop", "tablet"] as const;
+
 const features = [
   "Model match",
   "Registry status",
@@ -16,7 +18,61 @@ const features = [
 
 type Feature = (typeof features)[number];
 
+function useDeviceWord() {
+  const [device, setDevice] = useState<string>("phone");
+  const [reducedMotion, setReducedMotion] = useState(true);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    if (!mediaQuery) return;
+
+    const updatePreference = () => setReducedMotion(mediaQuery.matches);
+
+    updatePreference();
+    mediaQuery.addEventListener("change", updatePreference);
+    return () => mediaQuery.removeEventListener("change", updatePreference);
+  }, []);
+
+  useEffect(() => {
+    if (reducedMotion) return;
+
+    let deviceIndex = 0;
+    let timeout: number;
+
+    function typeDevice(word: string, length: number) {
+      setDevice(word.slice(0, length));
+      if (length < word.length) {
+        timeout = window.setTimeout(() => typeDevice(word, length + 1), 90);
+      } else {
+        timeout = window.setTimeout(() => deleteDevice(word, word.length), 1600);
+      }
+    }
+
+    function deleteDevice(word: string, length: number) {
+      if (length > 0) {
+        setDevice(word.slice(0, length - 1));
+        timeout = window.setTimeout(() => deleteDevice(word, length - 1), 50);
+      } else {
+        deviceIndex = (deviceIndex + 1) % devices.length;
+        timeout = window.setTimeout(
+          () => typeDevice(devices[deviceIndex], 1),
+          90,
+        );
+      }
+    }
+
+    timeout = window.setTimeout(
+      () => deleteDevice(devices[deviceIndex], devices[deviceIndex].length),
+      1600,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [reducedMotion]);
+
+  return reducedMotion ? "phone" : device;
+}
+
 export default function Home() {
+  const device = useDeviceWord();
   const [imei, setImei] = useState("");
   const [imeiMessage, setImeiMessage] = useState("");
   const [email, setEmail] = useState("");
@@ -96,12 +152,18 @@ export default function Home() {
         <div className="hero-inner">
           <div className="hero-copy">
             <p className="eyebrow"><span /> A smarter second-hand buy</p>
-            <h1 id="hero-title">
-              Know what you&apos;re buying<span className="headline-period">.</span>
+            <h1 aria-label="Check a phone before you pay." id="hero-title">
+              Check a{" "}
+              <span aria-hidden="true" className="headline-device">
+                <span className="headline-device-sizer">laptop</span>
+                <span className="headline-device-word">{device}</span>
+                <span className="headline-cursor" />
+              </span>{" "}
+              before you pay.
             </h1>
             <p className="hero-description">
-              A little more information can make a big difference. Check a
-              phone before you buy with CheckAm.
+              Confirm the model matches what the seller says, see if the owner
+              reported it lost or stolen, and ask the seller for proof.
             </p>
             <a className="primary-link" href="#imei-check">
               Check a phone <span aria-hidden="true">↓</span>
@@ -116,11 +178,20 @@ export default function Home() {
               <span className="card-label">BEFORE YOU PAY</span>
               <span className="card-dot" aria-hidden="true" />
             </div>
-            <div className="phone-illustration" aria-hidden="true">
+            <div
+              aria-label="CheckAm phone illustration"
+              className="phone-illustration"
+              role="img"
+              tabIndex={0}
+            >
               <div className="phone-outline">
                 <div className="phone-camera" />
                 <div className="phone-screen">
-                  <span className="phone-check">✓</span>
+                  <span className="phone-check">
+                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                      <path className="phone-check-path" d="m3 12 6 6L21 5" />
+                    </svg>
+                  </span>
                   <span className="phone-screen-line" />
                   <span className="phone-screen-line short" />
                 </div>
