@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="CheckAm icon">
+  <rect x="10" y="10" width="100" height="100" rx="28" fill="#176C56"/>
+  <path d="M34 55c0-13.8 11.2-25 25-25h17c13.8 0 25 11.2 25 25v16c0 13.8-11.2 25-25 25H52l-16 18V76H59c-13.8 0-25-11.2-25-25V55Z" fill="#fff"/>
+  <path d="M43 60l12 12 24-27" stroke="#176C56" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M79 18l9 10-3 14-14-3 8-21Z" fill="#E79A48"/>
+</svg>
