@@ -9,6 +9,8 @@ ASP.NET Core API foundation.
 
 - Steps 0 and 2: DONE.
 - Step 1: CURRENT — deploy the landing page and demand test.
+- Steps 1b and 1c: DONE.
+- Step 1d: DONE — add TAC model lookup to the paid report.
 - Step 3: BLOCKED — the phone OTP flow exists, but a production SMS sender is
   deferred until a provider is chosen.
 - Steps 4–11: TODO.
@@ -23,6 +25,16 @@ The server-gated `/report/[reference]` route is enabled only with
 `FEATURE_PAYMENTS=true` and only after a successful payment reference is
 confirmed server-side. It keeps the report behind a redirect to `/` for any
 unpaid, pending, failed or made-up reference and includes a print-to-PDF action.
+The report's model code check looks up the first eight IMEI digits (TAC) in the
+local `tac_models` table. Payment records store the TAC, not the full IMEI.
+Seller descriptions are compared using normalized word tokens; partial overlap
+is reported as inconclusive.
+
+To load an Osmocom TAC CSV with `tac`, `brand`, and `model` columns, place it at
+`apps/web/data/tac.csv` and run `npm run import:tac` from `apps/web` with
+`DATABASE_URL` set. The data directory is ignored by Git. Imports skip invalid
+rows, let the last valid duplicate TAC take precedence, and update existing TAC
+records.
 
 ## Local development
 

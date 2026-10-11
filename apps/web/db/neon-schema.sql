@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS payments (
   status TEXT NOT NULL CHECK (status IN ('pending', 'success', 'failed')),
   email TEXT NOT NULL,
   imei_hash TEXT,
+  tac CHAR(8),
   imei_last4 CHAR(4),
   imei_format_valid BOOLEAN,
   imei_luhn_valid BOOLEAN,
@@ -47,6 +48,14 @@ CREATE TABLE IF NOT EXISTS payments (
   CHECK ((imei_hash IS NULL) = (imei_last4 IS NULL)),
   CHECK ((imei_hash IS NULL) = (imei_format_valid IS NULL)),
   CHECK ((imei_hash IS NULL) = (imei_luhn_valid IS NULL))
+);
+
+CREATE TABLE IF NOT EXISTS tac_models (
+  tac CHAR(8) PRIMARY KEY,
+  brand TEXT,
+  model TEXT,
+  source TEXT,
+  imported_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS payments_status_created_at_idx

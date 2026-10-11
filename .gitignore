@@ -3,6 +3,7 @@ node_modules/
 .next/
 out/
 .npm/
+apps/web/data/
 .env
 .env.*
 

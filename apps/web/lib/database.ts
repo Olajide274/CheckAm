@@ -58,6 +58,7 @@ async function initializeSchema(client: Pool | PoolClient): Promise<void> {
       status TEXT NOT NULL CHECK (status IN ('pending', 'success', 'failed')),
       email TEXT NOT NULL,
       imei_hash TEXT,
+      tac CHAR(8),
       imei_last4 CHAR(4),
       imei_format_valid BOOLEAN,
       imei_luhn_valid BOOLEAN,
@@ -67,6 +68,16 @@ async function initializeSchema(client: Pool | PoolClient): Promise<void> {
       CHECK ((imei_hash IS NULL) = (imei_last4 IS NULL)),
       CHECK ((imei_hash IS NULL) = (imei_format_valid IS NULL)),
       CHECK ((imei_hash IS NULL) = (imei_luhn_valid IS NULL))
+    );
+
+    ALTER TABLE payments ADD COLUMN IF NOT EXISTS tac CHAR(8);
+
+    CREATE TABLE IF NOT EXISTS tac_models (
+      tac CHAR(8) PRIMARY KEY,
+      brand TEXT,
+      model TEXT,
+      source TEXT,
+      imported_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
     CREATE INDEX IF NOT EXISTS payments_status_created_at_idx
@@ -142,6 +153,7 @@ export interface PaymentRecord {
   amount: number;
   status: PaymentStatus;
   createdAt: Date;
+  tac: string | null;
   imeiLast4: string | null;
   imeiFormatValid: boolean | null;
   imeiLuhnValid: boolean | null;
@@ -151,6 +163,7 @@ export async function createPendingPayment(input: {
   reference: string;
   email: string;
   imeiHash: string | null;
+  tac: string | null;
   imeiLast4: string | null;
   imeiFormatValid: boolean | null;
   imeiLuhnValid: boolean | null;
@@ -165,12 +178,13 @@ export async function createPendingPayment(input: {
   );
   await pool.query(
     `INSERT INTO payments
-       (reference, amount, status, email, imei_hash, imei_last4, imei_format_valid, imei_luhn_valid)
-     VALUES ($1, 50000, 'pending', $2, $3, $4, $5, $6)`,
+       (reference, amount, status, email, imei_hash, tac, imei_last4, imei_format_valid, imei_luhn_valid)
+     VALUES ($1, 50000, 'pending', $2, $3, $4, $5, $6, $7)`,
     [
       input.reference,
       input.email,
       input.imeiHash,
+      input.tac,
       input.imeiLast4,
       input.imeiFormatValid,
       input.imeiLuhnValid,
@@ -196,11 +210,12 @@ export async function getPaymentByReference(
     amount: number;
     status: PaymentStatus;
     created_at: Date;
+    tac: string | null;
     imei_last4: string | null;
     imei_format_valid: boolean | null;
     imei_luhn_valid: boolean | null;
   }>(
-    `SELECT reference, amount, status, created_at, imei_last4, imei_format_valid, imei_luhn_valid
+    `SELECT reference, amount, status, created_at, tac, imei_last4, imei_format_valid, imei_luhn_valid
      FROM payments
      WHERE reference = $1`,
     [reference],
@@ -212,11 +227,26 @@ export async function getPaymentByReference(
         amount: payment.amount,
         status: payment.status,
         createdAt: payment.created_at,
+        tac: payment.tac?.trimEnd() ?? null,
         imeiLast4: payment.imei_last4,
         imeiFormatValid: payment.imei_format_valid,
         imeiLuhnValid: payment.imei_luhn_valid,
       }
     : null;
+}
+
+export async function findTacModel(
+  tac: string,
+): Promise<{ brand: string | null; model: string | null } | null> {
+  await ensureSchema();
+  const result = await getPool().query<{
+    brand: string | null;
+    model: string | null;
+  }>(
+    "SELECT brand, model FROM tac_models WHERE tac = $1",
+    [tac],
+  );
+  return result.rows[0] ?? null;
 }
 
 export async function markPaymentSuccessful(

@@ -1,0 +1,6 @@
+tac,brand,model
+12345678,"Acme, Inc.","Aster 1"
+12345678,Acme,Aster 1 Plus
+"87654321","Brand ""Two""","Model, Pro"
+1234,Wrong,Short
+99999999,,Missing

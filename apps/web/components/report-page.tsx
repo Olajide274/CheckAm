@@ -1,17 +1,24 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import type { PaymentRecord } from "@/lib/database";
 import { isBillOfSaleEnabled } from "@/lib/features";
+import { compareSellerDescription } from "@/lib/model-description";
+import type { ModelLookupResult } from "@/lib/model-lookup";
 
 export default function ReportPageContent({
+  model,
   payment,
 }: {
+  model: ModelLookupResult;
   payment: PaymentRecord;
 }) {
+  const [sellerDescription, setSellerDescription] = useState("");
   const formatResult =
     payment.imeiFormatValid === true ? "valid" : "invalid";
   const luhnResult = payment.imeiLuhnValid === true ? "pass" : "fail";
+  const sellerMatch = compareSellerDescription(sellerDescription, model);
 
   return (
     <main className="report-page">
@@ -44,8 +51,33 @@ export default function ReportPageContent({
         </section>
 
         <section className="report-section">
-          <h2>Model check</h2>
-          <p>Model check is not available yet.</p>
+          <h2>Model code check</h2>
+          {model.status === "found" ? (
+            <p>
+              <strong>{model.brand}</strong> {model.model}
+            </p>
+          ) : (
+            <p>Model not found in our database</p>
+          )}
+          <p>
+            Model codes can be wrong or out of date. This does not confirm the
+            device&apos;s origin.
+          </p>
+          <label className="report-model-label">
+            What does the seller say this phone is?
+            <input
+              className="report-model-input"
+              maxLength={120}
+              onChange={(event) => setSellerDescription(event.target.value)}
+              type="text"
+              value={sellerDescription}
+            />
+          </label>
+          {sellerDescription.trim() && (
+            <p aria-live="polite" className="report-model-match">
+              {sellerMatch}
+            </p>
+          )}
         </section>
 
         <section className="report-section">
@@ -114,6 +146,9 @@ export default function ReportPageContent({
             <Link href="/bill-of-sale">Bill of Sale</Link>
           </section>
         )}
+        <footer className="report-footer">
+          Model data: Osmocom TAC database, CC-BY-SA 3.0
+        </footer>
       </div>
     </main>
   );

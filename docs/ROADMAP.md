@@ -13,6 +13,9 @@ Done when: a fast, mobile-first landing page with the CheckAm logo; a "Check a p
 ## Step 1c: Paystack test checkout (DONE)
 Done when: a default-off payment feature flag enables the Preview-only ₦500 test checkout; payment initialization stores a unique pending reference before calling Paystack; raw-body webhook signatures are checked and successful payments are verified server-to-server; a rate-limited status route reports only paid/pending/failed and verifies pending payments; IMEI values are stored only as a keyed hash and last four digits plus the format/Luhn checks; pending payments expire after 30 minutes; and the landing page polls before showing a payment-received message. The report route is server-gated behind `FEATURE_PAYMENTS`, redirects any unpaid or invalid reference to `/`, and keeps the printable report view behind a successful payment only.
 
+## Step 1d: TAC model lookup (DONE)
+Done when: payment records store only the first eight IMEI digits for model lookup in addition to the existing protected IMEI fields; `tac_models` holds imported TAC, brand, model, source, and import time; a CSV importer handles quoted values and duplicate TACs and skips invalid rows; the paid report looks up TAC data server-side behind `FEATURE_PAYMENTS`, compares an optional seller description using normalized tokens, and displays the data source and limitations; and lookup, comparison, importer, and payment-storage tests pass.
+
 ## Step 1b: Bill of sale generator (DONE)
 Done when: a default-off feature flag controls the generator; the form captures both parties' names and phone numbers, device type, brand/model, IMEI or serial number, price in naira, date, and condition notes; 15-digit IMEIs pass Luhn validation; the browser creates a printable PDF with the required disclaimer; and agreement details can be shared through a fragment-based link on WhatsApp without being stored on the server.
 

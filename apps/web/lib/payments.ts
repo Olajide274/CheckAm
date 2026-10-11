@@ -110,6 +110,7 @@ export function getPaymentCallbackUrl(requestUrl: string): string {
 
 function getImeiHash(imei: string): {
   hash: string;
+  tac: string;
   last4: string;
   formatValid: boolean;
   luhnValid: boolean;
@@ -131,6 +132,7 @@ function getImeiHash(imei: string): {
 
   return {
     hash: createHmac("sha256", hashSecret).update(normalized).digest("hex"),
+    tac: normalized.slice(0, 8),
     last4: normalized.slice(-4),
     formatValid,
     luhnValid: true,
@@ -155,6 +157,7 @@ export async function initializePayment(input: {
     reference,
     email,
     imeiHash: imei?.hash ?? null,
+    tac: imei?.tac ?? null,
     imeiLast4: imei?.last4 ?? null,
     imeiFormatValid: imei?.formatValid ?? null,
     imeiLuhnValid: imei?.luhnValid ?? null,
