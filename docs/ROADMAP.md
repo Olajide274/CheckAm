@@ -10,6 +10,9 @@ Done when: README explains the project; folders exist; docker-compose runs Postg
 ## Step 1: Landing page deployment (CURRENT)
 Done when: a fast, mobile-first landing page with the CheckAm logo; a "Check a phone before you buy" input that validates IMEI format only; a waitlist form saving to PostgreSQL; a "Get the full report, N500" button that only records clicks; a one-question sign-up ("which feature would you use most?"); basic analytics events; deployed.
 
+## Step 1b: Bill of sale generator (DONE)
+Done when: a default-off feature flag controls the generator; the form captures both parties' names and phone numbers, device type, brand/model, IMEI or serial number, price in naira, date, and condition notes; 15-digit IMEIs pass Luhn validation; the browser creates a printable PDF with the required disclaimer; and agreement details can be shared through a fragment-based link on WhatsApp without being stored on the server.
+
 ## Step 2: API foundation (DONE)
 Done when: health endpoint; global error handling; structured logging; rate limiting; migrations run in CI; OpenAPI docs.
 

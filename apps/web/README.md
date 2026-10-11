@@ -22,6 +22,19 @@ analytics request. To create them in advance, run
 
 The IMEI form checks the 15-digit format and Luhn checksum in the browser. It does not run a registry check. The full-report button records interest only; it does not start a payment.
 
+## Bill of sale
+
+The browser-only bill of sale generator is disabled unless
+`FEATURE_BILL_OF_SALE=true` is set in the app's environment. Agreement details
+stay in the browser and are shared through a URL fragment; they are not saved
+on CheckAm servers. To enable it locally, run this from `apps/web`:
+
+```bash
+FEATURE_BILL_OF_SALE=true npm run dev
+```
+
+Use the print action and choose “Save as PDF” to export the agreement.
+
 ## Tests
 
 ```bash

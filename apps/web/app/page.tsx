@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { CheckAmLogo } from "@/components/checkam-logo";
+import { isBillOfSaleEnabled } from "@/lib/features";
 import { isValidImei } from "@/lib/imei";
 import { trackEvent } from "@/lib/track-event";
 
@@ -141,6 +142,11 @@ export default function Home() {
         <div className="header-inner">
           <CheckAmLogo />
           <div className="header-actions">
+            {isBillOfSaleEnabled() && (
+              <a className="header-link" href="/bill-of-sale">
+                Bill of sale
+              </a>
+            )}
             <a className="header-link" href="#waitlist">
               Get early access <span aria-hidden="true">↗</span>
             </a>

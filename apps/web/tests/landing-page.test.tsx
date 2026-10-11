@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import Home from "@/app/page";
 
 const originalMatchMedia = Object.getOwnPropertyDescriptor(window, "matchMedia");
+const originalBillOfSaleFlag = process.env.FEATURE_BILL_OF_SALE;
 
 describe("landing page", () => {
   afterEach(() => {
@@ -13,6 +14,11 @@ describe("landing page", () => {
       Object.defineProperty(window, "matchMedia", originalMatchMedia);
     } else {
       Reflect.deleteProperty(window, "matchMedia");
+    }
+    if (originalBillOfSaleFlag === undefined) {
+      delete process.env.FEATURE_BILL_OF_SALE;
+    } else {
+      process.env.FEATURE_BILL_OF_SALE = originalBillOfSaleFlag;
     }
   });
 
@@ -93,5 +99,34 @@ describe("landing page", () => {
     expect(
       await screen.findByText("Enter a valid 15-digit IMEI and try again."),
     ).toBeDefined();
+  });
+
+  it("shows the bill of sale link only when the feature flag is enabled", () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }))),
+    );
+    process.env.FEATURE_BILL_OF_SALE = "true";
+    render(<Home />);
+
+    expect(screen.getByRole("link", { name: "Bill of sale" }).getAttribute("href")).toBe(
+      "/bill-of-sale",
+    );
+
+    cleanup();
+    process.env.FEATURE_BILL_OF_SALE = "false";
+    render(<Home />);
+    expect(screen.queryByRole("link", { name: "Bill of sale" })).toBeNull();
+  });
+
+  it("keeps the bill of sale link hidden when the feature flag is unset", () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }))),
+    );
+    delete process.env.FEATURE_BILL_OF_SALE;
+    render(<Home />);
+
+    expect(screen.queryByRole("link", { name: "Bill of sale" })).toBeNull();
   });
 });
