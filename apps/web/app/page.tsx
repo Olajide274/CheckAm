@@ -380,6 +380,9 @@ export default function Home() {
               {paymentState === "paid" && (
                 <div className="payment-success" role="status">
                   <strong>Payment received. Full report is being prepared.</strong>
+                  <a href={`/report/${encodeURIComponent(paymentReference)}`}>
+                    Open the report
+                  </a>
                   {isBillOfSaleEnabled() && (
                     <a className="header-link" href="/bill-of-sale">
                       Bill of Sale

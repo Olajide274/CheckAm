@@ -59,10 +59,14 @@ async function initializeSchema(client: Pool | PoolClient): Promise<void> {
       email TEXT NOT NULL,
       imei_hash TEXT,
       imei_last4 CHAR(4),
+      imei_format_valid BOOLEAN,
+      imei_luhn_valid BOOLEAN,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       paid_at TIMESTAMPTZ,
       CHECK ((status = 'success') = (paid_at IS NOT NULL)),
-      CHECK ((imei_hash IS NULL) = (imei_last4 IS NULL))
+      CHECK ((imei_hash IS NULL) = (imei_last4 IS NULL)),
+      CHECK ((imei_hash IS NULL) = (imei_format_valid IS NULL)),
+      CHECK ((imei_hash IS NULL) = (imei_luhn_valid IS NULL))
     );
 
     CREATE INDEX IF NOT EXISTS payments_status_created_at_idx
@@ -138,6 +142,9 @@ export interface PaymentRecord {
   amount: number;
   status: PaymentStatus;
   createdAt: Date;
+  imeiLast4: string | null;
+  imeiFormatValid: boolean | null;
+  imeiLuhnValid: boolean | null;
 }
 
 export async function createPendingPayment(input: {
@@ -145,6 +152,8 @@ export async function createPendingPayment(input: {
   email: string;
   imeiHash: string | null;
   imeiLast4: string | null;
+  imeiFormatValid: boolean | null;
+  imeiLuhnValid: boolean | null;
 }): Promise<void> {
   await ensureSchema();
   const pool = getPool();
@@ -156,9 +165,16 @@ export async function createPendingPayment(input: {
   );
   await pool.query(
     `INSERT INTO payments
-       (reference, amount, status, email, imei_hash, imei_last4)
-     VALUES ($1, 50000, 'pending', $2, $3, $4)`,
-    [input.reference, input.email, input.imeiHash, input.imeiLast4],
+       (reference, amount, status, email, imei_hash, imei_last4, imei_format_valid, imei_luhn_valid)
+     VALUES ($1, 50000, 'pending', $2, $3, $4, $5, $6)`,
+    [
+      input.reference,
+      input.email,
+      input.imeiHash,
+      input.imeiLast4,
+      input.imeiFormatValid,
+      input.imeiLuhnValid,
+    ],
   );
 }
 
@@ -180,8 +196,11 @@ export async function getPaymentByReference(
     amount: number;
     status: PaymentStatus;
     created_at: Date;
+    imei_last4: string | null;
+    imei_format_valid: boolean | null;
+    imei_luhn_valid: boolean | null;
   }>(
-    `SELECT reference, amount, status, created_at
+    `SELECT reference, amount, status, created_at, imei_last4, imei_format_valid, imei_luhn_valid
      FROM payments
      WHERE reference = $1`,
     [reference],
@@ -193,6 +212,9 @@ export async function getPaymentByReference(
         amount: payment.amount,
         status: payment.status,
         createdAt: payment.created_at,
+        imeiLast4: payment.imei_last4,
+        imeiFormatValid: payment.imei_format_valid,
+        imeiLuhnValid: payment.imei_luhn_valid,
       }
     : null;
 }

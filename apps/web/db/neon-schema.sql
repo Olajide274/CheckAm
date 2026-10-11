@@ -39,10 +39,14 @@ CREATE TABLE IF NOT EXISTS payments (
   email TEXT NOT NULL,
   imei_hash TEXT,
   imei_last4 CHAR(4),
+  imei_format_valid BOOLEAN,
+  imei_luhn_valid BOOLEAN,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   paid_at TIMESTAMPTZ,
   CHECK ((status = 'success') = (paid_at IS NOT NULL)),
-  CHECK ((imei_hash IS NULL) = (imei_last4 IS NULL))
+  CHECK ((imei_hash IS NULL) = (imei_last4 IS NULL)),
+  CHECK ((imei_hash IS NULL) = (imei_format_valid IS NULL)),
+  CHECK ((imei_hash IS NULL) = (imei_luhn_valid IS NULL))
 );
 
 CREATE INDEX IF NOT EXISTS payments_status_created_at_idx

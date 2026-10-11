@@ -1469,6 +1469,117 @@ a {
   break-inside: avoid;
 }
 
+.report-page {
+  min-height: 100vh;
+  padding: 32px 20px 48px;
+  background: #f1f4ec;
+}
+
+.report-card {
+  width: min(100%, 760px);
+  margin: 0 auto;
+  padding: clamp(20px, 4vw, 36px);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fffefa;
+  box-shadow: 0 12px 34px rgb(25 45 42 / 6%);
+}
+
+.report-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.report-eyebrow {
+  margin: 0 0 8px;
+  color: var(--green);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.report-header h1 {
+  margin: 0;
+  font-size: clamp(32px, 4vw, 44px);
+  letter-spacing: -0.05em;
+}
+
+.report-print-button {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--green);
+  color: white;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.report-section {
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+}
+
+.report-section:first-of-type {
+  margin-top: 0;
+}
+
+.report-section h2 {
+  margin: 0 0 12px;
+  font-size: clamp(20px, 2vw, 26px);
+  letter-spacing: -0.04em;
+}
+
+.report-section p,
+.report-section li {
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.report-status {
+  margin: 0 0 8px;
+  color: var(--green);
+  font-weight: 700;
+}
+
+.checklist {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.checklist li {
+  display: flex;
+  align-items: center;
+}
+
+.checklist input {
+  width: 16px;
+  height: 16px;
+  margin: 0 10px 0 0;
+  accent-color: var(--green);
+}
+
+.report-section ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.report-section a {
+  color: var(--green);
+  font-weight: 700;
+}
+
 @media (max-width: 600px) {
     .bill-form,
     .bill-document-grid {
@@ -1486,11 +1597,13 @@ a {
 
 @media print {
     @page {
-      margin: 18mm;
+      size: A4;
+      margin: 12mm;
     }
 
     body,
-    .bill-page {
+    .bill-page,
+    .report-page {
       min-height: 0;
       padding: 0;
       background: white;
@@ -1499,19 +1612,28 @@ a {
     .bill-page-header,
     .bill-heading,
     .bill-intro,
-    .bill-form {
+    .bill-form,
+    .report-print-button,
+    nav,
+    a {
       display: none !important;
     }
 
-    .bill-page-inner {
+    .bill-page-inner,
+    .report-card {
       width: 100%;
-    }
-
-    .bill-document {
       margin: 0;
       padding: 0;
       border: 0;
       border-radius: 0;
+      box-shadow: none;
+    }
+
+    .bill-document,
+    .report-card {
+      margin: 0;
+      padding: 0;
+      border: 0;
       box-shadow: none;
     }
   }

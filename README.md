@@ -19,6 +19,10 @@ The IMEI check validates input format only; it does not check a device registry.
 The ₦500 button records interest and does not take payment.
 The public `/login` and `/app` routes show a Coming soon page. The OTP
 implementation remains in the repository but is not exposed on the public site.
+The server-gated `/report/[reference]` route is enabled only with
+`FEATURE_PAYMENTS=true` and only after a successful payment reference is
+confirmed server-side. It keeps the report behind a redirect to `/` for any
+unpaid, pending, failed or made-up reference and includes a print-to-PDF action.
 
 ## Local development
 

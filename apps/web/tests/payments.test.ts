@@ -72,6 +72,9 @@ describe("payment routes", () => {
       amount: 50_000,
       status: "pending",
       createdAt: new Date(),
+      imeiLast4: "7518",
+      imeiFormatValid: true,
+      imeiLuhnValid: true,
     });
     vi.mocked(markPaymentFailed).mockResolvedValue("failed");
     vi.mocked(markPaymentSuccessful).mockResolvedValue("success");
@@ -119,6 +122,8 @@ describe("payment routes", () => {
       email: "buyer@example.com",
       imeiHash: null,
       imeiLast4: null,
+      imeiFormatValid: null,
+      imeiLuhnValid: null,
     });
     expect(transaction.amount).toBe(50_000);
     expect(transaction.currency).toBe("NGN");
@@ -155,6 +160,8 @@ describe("payment routes", () => {
       expect.objectContaining({
         imeiHash: expect.stringMatching(/^[a-f\d]{64}$/),
         imeiLast4: "7518",
+        imeiFormatValid: true,
+        imeiLuhnValid: true,
       }),
     );
     expect(JSON.stringify(vi.mocked(createPendingPayment).mock.calls)).not.toContain(
@@ -227,6 +234,140 @@ describe("payment routes", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ status: "paid" });
     expect(markPaymentSuccessful).toHaveBeenCalledWith(reference);
+  });
+
+  it("keeps abandoned or ongoing statuses pending until expiry", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      Response.json({
+        status: true,
+        data: {
+          reference,
+          amount: 50_000,
+          currency: "NGN",
+          status: "abandoned",
+        },
+      }),
+    );
+
+    const response = await statusGet(
+      new Request(
+        `http://localhost/api/payments/status?reference=${reference}`,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: "pending" });
+    expect(markPaymentFailed).not.toHaveBeenCalled();
+    expect(markPaymentSuccessful).not.toHaveBeenCalled();
+
+    vi.mocked(fetch).mockResolvedValue(
+      Response.json({
+        status: true,
+        data: {
+          reference,
+          amount: 50_000,
+          currency: "NGN",
+          status: "ongoing",
+        },
+      }),
+    );
+
+    const ongoingResponse = await statusGet(
+      new Request(
+        `http://localhost/api/payments/status?reference=${reference}`,
+      ),
+    );
+
+    expect(ongoingResponse.status).toBe(200);
+    expect(await ongoingResponse.json()).toEqual({ status: "pending" });
+  });
+
+  it("marks failed only for an explicit failed status or expiry", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      Response.json({
+        status: true,
+        data: {
+          reference,
+          amount: 50_000,
+          currency: "NGN",
+          status: "failed",
+        },
+      }),
+    );
+
+    const failedResponse = await statusGet(
+      new Request(
+        `http://localhost/api/payments/status?reference=${reference}`,
+      ),
+    );
+
+    expect(failedResponse.status).toBe(200);
+    expect(await failedResponse.json()).toEqual({ status: "failed" });
+    expect(markPaymentFailed).toHaveBeenCalledWith(reference);
+
+    vi.mocked(getPaymentByReference).mockResolvedValue({
+      reference,
+      amount: 50_000,
+      status: "pending",
+      createdAt: new Date(Date.now() - 31 * 60 * 1000),
+      imeiLast4: "7518",
+      imeiFormatValid: true,
+      imeiLuhnValid: true,
+    });
+    vi.mocked(fetch).mockResolvedValue(
+      Response.json({
+        status: true,
+        data: {
+          reference,
+          amount: 50_000,
+          currency: "NGN",
+          status: "pending",
+        },
+      }),
+    );
+
+    const expiredResponse = await statusGet(
+      new Request(
+        `http://localhost/api/payments/status?reference=${reference}`,
+      ),
+    );
+
+    expect(expiredResponse.status).toBe(200);
+    expect(await expiredResponse.json()).toEqual({ status: "failed" });
+  });
+
+  it("keeps a successful payment from changing to another status", async () => {
+    vi.mocked(getPaymentByReference).mockResolvedValue({
+      reference,
+      amount: 50_000,
+      status: "success",
+      createdAt: new Date(),
+      imeiLast4: "7518",
+      imeiFormatValid: true,
+      imeiLuhnValid: true,
+    });
+    vi.mocked(fetch).mockResolvedValue(
+      Response.json({
+        status: true,
+        data: {
+          reference,
+          amount: 50_000,
+          currency: "NGN",
+          status: "pending",
+        },
+      }),
+    );
+
+    const response = await statusGet(
+      new Request(
+        `http://localhost/api/payments/status?reference=${reference}`,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: "paid" });
+    expect(markPaymentFailed).not.toHaveBeenCalled();
+    expect(markPaymentSuccessful).not.toHaveBeenCalled();
   });
 
   it("rejects a transaction with an amount other than ₦500", async () => {

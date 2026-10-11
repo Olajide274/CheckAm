@@ -108,7 +108,12 @@ export function getPaymentCallbackUrl(requestUrl: string): string {
   return callbackUrl.toString();
 }
 
-function getImeiHash(imei: string): { hash: string; last4: string } {
+function getImeiHash(imei: string): {
+  hash: string;
+  last4: string;
+  formatValid: boolean;
+  luhnValid: boolean;
+} {
   const normalized = normalizeImei(imei);
   if (!normalized) {
     throw new PaymentFlowError("Enter a valid IMEI or leave it blank.", 400);
@@ -122,9 +127,13 @@ function getImeiHash(imei: string): { hash: string; last4: string } {
     );
   }
 
+  const formatValid = /^\d{15}$/.test(imei.replace(/[\s-]/g, ""));
+
   return {
     hash: createHmac("sha256", hashSecret).update(normalized).digest("hex"),
     last4: normalized.slice(-4),
+    formatValid,
+    luhnValid: true,
   };
 }
 
@@ -147,6 +156,8 @@ export async function initializePayment(input: {
     email,
     imeiHash: imei?.hash ?? null,
     imeiLast4: imei?.last4 ?? null,
+    imeiFormatValid: imei?.formatValid ?? null,
+    imeiLuhnValid: imei?.luhnValid ?? null,
   });
 
   let response: Response;
@@ -213,7 +224,12 @@ export async function initializePayment(input: {
   };
 }
 
-type PaystackTransactionStatus = "success" | "pending" | "failed";
+type PaystackTransactionStatus =
+  | "success"
+  | "pending"
+  | "failed"
+  | "abandoned"
+  | "ongoing";
 
 async function getPaystackTransactionStatus(
   reference: string,
@@ -255,17 +271,20 @@ async function getPaystackTransactionStatus(
   }
 
   const data = isRecord(payload.data) ? payload.data : null;
-  if (
-    !data ||
-    data.reference !== reference ||
-    data.amount !== PAYMENT_AMOUNT_KOBO ||
-    data.currency !== PAYMENT_CURRENCY
-  ) {
+  if (!data || data.reference !== reference) {
     return "failed";
   }
 
-  if (data.status === "success") return "success";
-  if (data.status === "pending") return "pending";
+  if (data.status === "success") {
+    return data.amount === PAYMENT_AMOUNT_KOBO && data.currency === PAYMENT_CURRENCY
+      ? "success"
+      : "failed";
+  }
+
+  if (data.status === "pending" || data.status === "abandoned" || data.status === "ongoing") {
+    return "pending";
+  }
+
   return "failed";
 }
 
