@@ -16,9 +16,8 @@ test("buyer checks IMEI format and joins the feature waitlist", async ({ page })
 
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Know what you're buying." }),
+    page.getByRole("heading", { name: "Check a phone before you pay." }),
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: "Log in" })).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,

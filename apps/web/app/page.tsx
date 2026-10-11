@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { CheckAmLogo } from "@/components/checkam-logo";
-import { isBillOfSaleEnabled } from "@/lib/features";
+import { arePaymentsEnabled, isBillOfSaleEnabled } from "@/lib/features";
 import { isValidImei } from "@/lib/imei";
 import { trackEvent } from "@/lib/track-event";
 
@@ -76,6 +76,12 @@ export default function Home() {
   const device = useDeviceWord();
   const [imei, setImei] = useState("");
   const [imeiMessage, setImeiMessage] = useState("");
+  const [receiptEmail, setReceiptEmail] = useState("");
+  const [paymentError, setPaymentError] = useState("");
+  const [paymentState, setPaymentState] = useState<
+    "idle" | "initializing" | "confirming" | "paid" | "failed" | "error"
+  >("idle");
+  const [paymentReference, setPaymentReference] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [feature, setFeature] = useState<Feature | "">("");
@@ -93,6 +99,79 @@ export default function Home() {
     }
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const reference = params.get("reference") ?? params.get("trxref");
+    if (reference) {
+      const timeout = window.setTimeout(() => {
+        setPaymentReference(reference);
+        setPaymentState("confirming");
+      }, 0);
+      return () => window.clearTimeout(timeout);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!paymentReference || paymentState !== "confirming") return;
+
+    let cancelled = false;
+    let timeout: number | undefined;
+
+    async function checkPaymentStatus() {
+      try {
+        const response = await fetch(
+          `/api/payments/status?reference=${encodeURIComponent(paymentReference)}`,
+          { cache: "no-store" },
+        );
+        if (cancelled) return;
+
+        if (response.status === 400 || response.status === 404) {
+          setPaymentError("We couldn’t find this payment. Please try again.");
+          setPaymentState("error");
+          return;
+        }
+        if (!response.ok) {
+          timeout = window.setTimeout(checkPaymentStatus, 5000);
+          return;
+        }
+
+        const result: unknown = await response.json();
+        if (
+          typeof result === "object" &&
+          result !== null &&
+          "status" in result
+        ) {
+          if (result.status === "paid") {
+            setPaymentState("paid");
+            return;
+          }
+          if (result.status === "failed") {
+            setPaymentState("failed");
+            return;
+          }
+          if (result.status === "pending") {
+            timeout = window.setTimeout(checkPaymentStatus, 5000);
+            return;
+          }
+        }
+
+        setPaymentError("We couldn’t confirm this payment. Please try again.");
+        setPaymentState("error");
+      } catch (error) {
+        console.error("Payment status request failed.", error);
+        if (!cancelled) {
+          timeout = window.setTimeout(checkPaymentStatus, 5000);
+        }
+      }
+    }
+
+    void checkPaymentStatus();
+    return () => {
+      cancelled = true;
+      if (timeout !== undefined) window.clearTimeout(timeout);
+    };
+  }, [paymentReference, paymentState]);
+
   function handleImeiSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void trackEvent("imei_check_attempted");
@@ -102,6 +181,53 @@ export default function Home() {
         ? "IMEI looks valid – full report coming soon"
         : "Enter a valid 15-digit IMEI and try again.",
     );
+  }
+
+  async function handlePaymentSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPaymentError("");
+
+    if (imei && !isValidImei(imei)) {
+      setPaymentError("Enter a valid IMEI or clear the IMEI field before paying.");
+      return;
+    }
+
+    setPaymentState("initializing");
+    void trackEvent("full_report_click");
+
+    try {
+      const response = await fetch("/api/payments/initialize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: receiptEmail,
+          ...(imei ? { imei } : {}),
+        }),
+      });
+      const result: unknown = await response.json();
+      if (
+        !response.ok ||
+        typeof result !== "object" ||
+        result === null ||
+        !("authorization_url" in result) ||
+        typeof result.authorization_url !== "string"
+      ) {
+        throw new Error("Payment initialization failed.");
+      }
+
+      const authorizationUrl = new URL(result.authorization_url);
+      if (
+        authorizationUrl.protocol !== "https:" ||
+        authorizationUrl.hostname !== "checkout.paystack.com"
+      ) {
+        throw new Error("Paystack returned an unexpected payment URL.");
+      }
+      window.location.assign(authorizationUrl.toString());
+    } catch (error) {
+      console.error("Payment initialization request failed.", error);
+      setPaymentError("We couldn’t start your payment. Please try again.");
+      setPaymentState("error");
+    }
   }
 
   async function handleWaitlistSubmit(event: FormEvent<HTMLFormElement>) {
@@ -246,17 +372,74 @@ export default function Home() {
               </p>
             </form>
             <div className="report-callout">
-              <div>
-                <strong>Want the full report?</strong>
-                <span>Help us understand what buyers need.</span>
-              </div>
-              <button
-                className="report-button"
-                onClick={() => void trackEvent("full_report_click")}
-                type="button"
-              >
-                Get the full report – ₦500
-              </button>
+              {paymentState === "confirming" && (
+                <p className="form-message" role="status">
+                  Confirming payment…
+                </p>
+              )}
+              {paymentState === "paid" && (
+                <div className="payment-success" role="status">
+                  <strong>Payment received. Full report is being prepared.</strong>
+                  {isBillOfSaleEnabled() && (
+                    <a className="header-link" href="/bill-of-sale">
+                      Bill of Sale
+                    </a>
+                  )}
+                </div>
+              )}
+              {paymentState === "failed" && (
+                <p className="form-message error" role="status">
+                  Payment wasn’t completed. You can try again.
+                </p>
+              )}
+              {(paymentState === "idle" ||
+                paymentState === "initializing" ||
+                paymentState === "error" ||
+                paymentState === "failed") &&
+                (arePaymentsEnabled() ? (
+                  <form className="payment-form" onSubmit={handlePaymentSubmit}>
+                    <div>
+                      <strong>Want the full report?</strong>
+                      <span>Enter an email for your receipt only.</span>
+                    </div>
+                    <label htmlFor="payment-email">Email for receipt</label>
+                    <input
+                      autoComplete="email"
+                      id="payment-email"
+                      name="payment-email"
+                      onChange={(event) => setReceiptEmail(event.target.value)}
+                      required
+                      type="email"
+                      value={receiptEmail}
+                    />
+                    <button
+                      className="report-button"
+                      disabled={paymentState === "initializing"}
+                      type="submit"
+                    >
+                      {paymentState === "initializing"
+                        ? "Starting payment…"
+                        : "Get the full report – ₦500"}
+                    </button>
+                    <p className="form-message error" role="alert">
+                      {paymentError}
+                    </p>
+                  </form>
+                ) : (
+                  <>
+                    <div>
+                      <strong>Want the full report?</strong>
+                      <span>Help us understand what buyers need.</span>
+                    </div>
+                    <button
+                      className="report-button"
+                      onClick={() => void trackEvent("full_report_click")}
+                      type="button"
+                    >
+                      Get the full report – ₦500
+                    </button>
+                  </>
+                ))}
             </div>
           </div>
         </div>

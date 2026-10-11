@@ -4,6 +4,9 @@ import Home from "@/app/page";
 
 const originalMatchMedia = Object.getOwnPropertyDescriptor(window, "matchMedia");
 const originalBillOfSaleFlag = process.env.FEATURE_BILL_OF_SALE;
+const originalPaymentsFlag = process.env.FEATURE_PAYMENTS;
+const originalAppEnvironment = process.env.APP_ENV;
+const originalVercelEnvironment = process.env.VERCEL_ENV;
 
 describe("landing page", () => {
   afterEach(() => {
@@ -20,6 +23,22 @@ describe("landing page", () => {
     } else {
       process.env.FEATURE_BILL_OF_SALE = originalBillOfSaleFlag;
     }
+    if (originalPaymentsFlag === undefined) {
+      delete process.env.FEATURE_PAYMENTS;
+    } else {
+      process.env.FEATURE_PAYMENTS = originalPaymentsFlag;
+    }
+    if (originalAppEnvironment === undefined) {
+      delete process.env.APP_ENV;
+    } else {
+      process.env.APP_ENV = originalAppEnvironment;
+    }
+    if (originalVercelEnvironment === undefined) {
+      delete process.env.VERCEL_ENV;
+    } else {
+      process.env.VERCEL_ENV = originalVercelEnvironment;
+    }
+    window.history.replaceState({}, "", "/");
   });
 
   it("keeps a static accessible headline label", () => {
@@ -128,5 +147,72 @@ describe("landing page", () => {
     render(<Home />);
 
     expect(screen.queryByRole("link", { name: "Bill of sale" })).toBeNull();
+  });
+
+  it("shows the paid state only after the server reports payment as paid", async () => {
+    process.env.FEATURE_PAYMENTS = "true";
+    process.env.FEATURE_BILL_OF_SALE = "true";
+    delete process.env.APP_ENV;
+    delete process.env.VERCEL_ENV;
+    window.history.replaceState(
+      {},
+      "",
+      "/?reference=2bb39cd6-fb82-4bf0-a00d-b744b4409f44",
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((input: RequestInfo | URL) => {
+        if (String(input).includes("/api/payments/status")) {
+          return Promise.resolve(
+            Response.json({ status: "paid" }),
+          );
+        }
+        return Promise.resolve(Response.json({ ok: true }));
+      }),
+    );
+
+    render(<Home />);
+
+    expect(
+      await screen.findByText(
+        "Payment received. Full report is being prepared.",
+      ),
+    ).toBeDefined();
+    expect(screen.getByRole("link", { name: "Bill of Sale" }).getAttribute("href"))
+      .toBe("/bill-of-sale");
+    expect(screen.queryByRole("link", { name: /full report/i })).toBeNull();
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/payments/status?reference=2bb39cd6-fb82-4bf0-a00d-b744b4409f44",
+      { cache: "no-store" },
+    );
+  });
+
+  it("does not show the paid state while the server reports pending", async () => {
+    process.env.FEATURE_PAYMENTS = "true";
+    delete process.env.APP_ENV;
+    delete process.env.VERCEL_ENV;
+    window.history.replaceState(
+      {},
+      "",
+      "/?reference=2bb39cd6-fb82-4bf0-a00d-b744b4409f44",
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((input: RequestInfo | URL) => {
+        if (String(input).includes("/api/payments/status")) {
+          return Promise.resolve(
+            Response.json({ status: "pending" }),
+          );
+        }
+        return Promise.resolve(Response.json({ ok: true }));
+      }),
+    );
+
+    render(<Home />);
+
+    expect(await screen.findByText("Confirming payment…")).toBeDefined();
+    expect(
+      screen.queryByText("Payment received. Full report is being prepared."),
+    ).toBeNull();
   });
 });

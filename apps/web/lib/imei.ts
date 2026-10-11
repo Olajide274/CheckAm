@@ -13,3 +13,8 @@ export function isValidImei(value: string): boolean {
 
   return sum % 10 === 0;
 }
+
+export function normalizeImei(value: string): string | null {
+  const normalized = value.replace(/[\s-]/g, "");
+  return isValidImei(normalized) ? normalized : null;
+}

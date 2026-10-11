@@ -10,6 +10,9 @@ Done when: README explains the project; folders exist; docker-compose runs Postg
 ## Step 1: Landing page deployment (CURRENT)
 Done when: a fast, mobile-first landing page with the CheckAm logo; a "Check a phone before you buy" input that validates IMEI format only; a waitlist form saving to PostgreSQL; a "Get the full report, N500" button that only records clicks; a one-question sign-up ("which feature would you use most?"); basic analytics events; deployed.
 
+## Step 1c: Paystack test checkout (DONE)
+Done when: a default-off payment feature flag enables the Preview-only ₦500 test checkout; payment initialization stores a unique pending reference before calling Paystack; raw-body webhook signatures are checked and successful payments are verified server-to-server; a rate-limited status route reports only paid/pending/failed and verifies pending payments; IMEI values are stored only as a keyed hash and last four digits; pending payments expire after 30 minutes; and the landing page polls before showing a payment-received message. No full-report content, PDF, or print view is available until a separate report feature exists.
+
 ## Step 1b: Bill of sale generator (DONE)
 Done when: a default-off feature flag controls the generator; the form captures both parties' names and phone numbers, device type, brand/model, IMEI or serial number, price in naira, date, and condition notes; 15-digit IMEIs pass Luhn validation; the browser creates a printable PDF with the required disclaimer; and agreement details can be shared through a fragment-based link on WhatsApp without being stored on the server.
 

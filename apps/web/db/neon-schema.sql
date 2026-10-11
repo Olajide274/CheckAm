@@ -30,3 +30,31 @@ CREATE TABLE IF NOT EXISTS analytics_events (
   properties JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS payments (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  reference UUID NOT NULL UNIQUE,
+  amount INTEGER NOT NULL CHECK (amount = 50000),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'success', 'failed')),
+  email TEXT NOT NULL,
+  imei_hash TEXT,
+  imei_last4 CHAR(4),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  paid_at TIMESTAMPTZ,
+  CHECK ((status = 'success') = (paid_at IS NOT NULL)),
+  CHECK ((imei_hash IS NULL) = (imei_last4 IS NULL))
+);
+
+CREATE INDEX IF NOT EXISTS payments_status_created_at_idx
+  ON payments (status, created_at);
+
+CREATE TABLE IF NOT EXISTS payment_rate_limits (
+  scope TEXT NOT NULL,
+  client_hash TEXT NOT NULL,
+  window_started_at TIMESTAMPTZ NOT NULL,
+  request_count INTEGER NOT NULL CHECK (request_count > 0),
+  PRIMARY KEY (scope, client_hash)
+);
+
+CREATE INDEX IF NOT EXISTS payment_rate_limits_window_started_at_idx
+  ON payment_rate_limits (window_started_at);

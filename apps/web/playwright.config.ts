@@ -15,6 +15,7 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     env: {
+      FEATURE_PAYMENTS: "false",
       DATABASE_URL:
         process.env.DATABASE_URL ??
         "postgresql://postgres:postgres@localhost:5432/checkam",

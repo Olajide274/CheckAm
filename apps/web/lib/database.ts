@@ -50,6 +50,34 @@ async function initializeSchema(client: Pool | PoolClient): Promise<void> {
       properties JSONB NOT NULL DEFAULT '{}'::jsonb,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS payments (
+      id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      reference UUID NOT NULL UNIQUE,
+      amount INTEGER NOT NULL CHECK (amount = 50000),
+      status TEXT NOT NULL CHECK (status IN ('pending', 'success', 'failed')),
+      email TEXT NOT NULL,
+      imei_hash TEXT,
+      imei_last4 CHAR(4),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      paid_at TIMESTAMPTZ,
+      CHECK ((status = 'success') = (paid_at IS NOT NULL)),
+      CHECK ((imei_hash IS NULL) = (imei_last4 IS NULL))
+    );
+
+    CREATE INDEX IF NOT EXISTS payments_status_created_at_idx
+      ON payments (status, created_at);
+
+    CREATE TABLE IF NOT EXISTS payment_rate_limits (
+      scope TEXT NOT NULL,
+      client_hash TEXT NOT NULL,
+      window_started_at TIMESTAMPTZ NOT NULL,
+      request_count INTEGER NOT NULL CHECK (request_count > 0),
+      PRIMARY KEY (scope, client_hash)
+    );
+
+    CREATE INDEX IF NOT EXISTS payment_rate_limits_window_started_at_idx
+      ON payment_rate_limits (window_started_at);
   `);
 }
 
@@ -101,6 +129,149 @@ export async function saveWaitlistSignup(input: {
   } finally {
     client.release();
   }
+}
+
+export type PaymentStatus = "pending" | "success" | "failed";
+
+export interface PaymentRecord {
+  reference: string;
+  amount: number;
+  status: PaymentStatus;
+  createdAt: Date;
+}
+
+export async function createPendingPayment(input: {
+  reference: string;
+  email: string;
+  imeiHash: string | null;
+  imeiLast4: string | null;
+}): Promise<void> {
+  await ensureSchema();
+  const pool = getPool();
+  await pool.query(
+    `UPDATE payments
+     SET status = 'failed'
+     WHERE status = 'pending'
+       AND created_at <= NOW() - INTERVAL '30 minutes'`,
+  );
+  await pool.query(
+    `INSERT INTO payments
+       (reference, amount, status, email, imei_hash, imei_last4)
+     VALUES ($1, 50000, 'pending', $2, $3, $4)`,
+    [input.reference, input.email, input.imeiHash, input.imeiLast4],
+  );
+}
+
+export async function getPaymentByReference(
+  reference: string,
+): Promise<PaymentRecord | null> {
+  await ensureSchema();
+  const pool = getPool();
+  await pool.query(
+    `UPDATE payments
+     SET status = 'failed'
+     WHERE reference = $1
+       AND status = 'pending'
+       AND created_at <= NOW() - INTERVAL '30 minutes'`,
+    [reference],
+  );
+  const result = await pool.query<{
+    reference: string;
+    amount: number;
+    status: PaymentStatus;
+    created_at: Date;
+  }>(
+    `SELECT reference, amount, status, created_at
+     FROM payments
+     WHERE reference = $1`,
+    [reference],
+  );
+  const payment = result.rows[0];
+  return payment
+    ? {
+        reference: payment.reference,
+        amount: payment.amount,
+        status: payment.status,
+        createdAt: payment.created_at,
+      }
+    : null;
+}
+
+export async function markPaymentSuccessful(
+  reference: string,
+): Promise<PaymentStatus | null> {
+  await ensureSchema();
+  const pool = getPool();
+  await pool.query(
+    `UPDATE payments
+     SET status = 'success', paid_at = NOW()
+     WHERE reference = $1
+       AND status = 'pending'
+       AND created_at > NOW() - INTERVAL '30 minutes'`,
+    [reference],
+  );
+  return getPaymentStatus(reference);
+}
+
+export async function markPaymentFailed(
+  reference: string,
+): Promise<PaymentStatus | null> {
+  await ensureSchema();
+  const pool = getPool();
+  await pool.query(
+    `UPDATE payments
+     SET status = 'failed'
+     WHERE reference = $1
+       AND status = 'pending'`,
+    [reference],
+  );
+  return getPaymentStatus(reference);
+}
+
+async function getPaymentStatus(
+  reference: string,
+): Promise<PaymentStatus | null> {
+  const result = await getPool().query<{ status: PaymentStatus }>(
+    "SELECT status FROM payments WHERE reference = $1",
+    [reference],
+  );
+  return result.rows[0]?.status ?? null;
+}
+
+export async function consumePaymentRateLimit(input: {
+  scope: string;
+  clientHash: string;
+  maxRequests: number;
+  windowSeconds: number;
+}): Promise<boolean> {
+  await ensureSchema();
+  const pool = getPool();
+  await pool.query(
+    `DELETE FROM payment_rate_limits
+     WHERE window_started_at < NOW() - INTERVAL '2 hours'`,
+  );
+  const result = await pool.query<{ request_count: number }>(
+    `INSERT INTO payment_rate_limits
+       (scope, client_hash, window_started_at, request_count)
+     VALUES ($1, $2, NOW(), 1)
+     ON CONFLICT (scope, client_hash) DO UPDATE
+     SET window_started_at = CASE
+           WHEN payment_rate_limits.window_started_at <=
+             NOW() - ($3 * INTERVAL '1 second')
+             THEN NOW()
+           ELSE payment_rate_limits.window_started_at
+         END,
+         request_count = CASE
+           WHEN payment_rate_limits.window_started_at <=
+             NOW() - ($3 * INTERVAL '1 second')
+             THEN 1
+           ELSE payment_rate_limits.request_count + 1
+         END
+     RETURNING request_count`,
+    [input.scope, input.clientHash, input.windowSeconds],
+  );
+  return (result.rows[0]?.request_count ?? input.maxRequests + 1) <=
+    input.maxRequests;
 }
 
 async function insertEvent(
