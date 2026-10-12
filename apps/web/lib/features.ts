@@ -10,6 +10,12 @@ export function isBillOfSaleEnabled(
   return featureFlag === "true";
 }
 
+export function isSellerProofEnabled(
+  featureFlag = process.env.FEATURE_SELLER_PROOF,
+): boolean {
+  return featureFlag === "true";
+}
+
 export function resolvePaymentsFlag(
   featureFlag: string | undefined,
   vercelEnvironment = process.env.VERCEL_ENV,

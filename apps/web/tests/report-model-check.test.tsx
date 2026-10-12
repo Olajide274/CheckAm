@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import ReportPageContent from "@/components/report-page";
 import type { PaymentRecord } from "@/lib/database";
 
@@ -14,17 +14,59 @@ const payment: PaymentRecord = {
   imeiLuhnValid: true,
 };
 
+const originalSellerProofFlag = process.env.FEATURE_SELLER_PROOF;
+const originalBillOfSaleFlag = process.env.FEATURE_BILL_OF_SALE;
+const originalClipboard = Object.getOwnPropertyDescriptor(
+  navigator,
+  "clipboard",
+);
+
+afterEach(() => {
+  if (originalSellerProofFlag === undefined) {
+    delete process.env.FEATURE_SELLER_PROOF;
+  } else {
+    process.env.FEATURE_SELLER_PROOF = originalSellerProofFlag;
+  }
+  if (originalBillOfSaleFlag === undefined) {
+    delete process.env.FEATURE_BILL_OF_SALE;
+  } else {
+    process.env.FEATURE_BILL_OF_SALE = originalBillOfSaleFlag;
+  }
+  if (originalClipboard) {
+    Object.defineProperty(navigator, "clipboard", originalClipboard);
+  } else {
+    Reflect.deleteProperty(navigator, "clipboard");
+  }
+  vi.unstubAllGlobals();
+});
+
 describe("report model code check", () => {
   it("shows found data and compares the seller description", () => {
+    process.env.FEATURE_BILL_OF_SALE = "true";
     render(
       <ReportPageContent
         model={{ status: "found", brand: "Acme", model: "Aster 1 Plus" }}
         payment={payment}
+        sellerProof={{
+          requested: false,
+          respondedAt: null,
+          proofId: null,
+          proofMime: null,
+          sellerPhone: null,
+        }}
       />,
     );
 
-    expect(screen.getByText("Model code check")).toBeTruthy();
+    expect(screen.getByText("Model match")).toBeTruthy();
     expect(screen.getByText("Aster 1 Plus")).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "Generate a Bill of Sale" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "This result is based on information reported by users. It is not proof of ownership, legality or safety.",
+      ),
+    ).toBeTruthy();
     fireEvent.change(
       screen.getByRole("textbox", {
         name: "What does the seller say this phone is?",
@@ -44,9 +86,90 @@ describe("report model code check", () => {
       <ReportPageContent
         model={{ status: "not_found", brand: null, model: null }}
         payment={payment}
+        sellerProof={{
+          requested: false,
+          respondedAt: null,
+          proofId: null,
+          proofMime: null,
+          sellerPhone: null,
+        }}
       />,
     );
 
     expect(screen.getByText("Model not found in our database")).toBeTruthy();
+  });
+
+  it("shows a Seller Proof response timestamp and private buyer contact", () => {
+    process.env.FEATURE_SELLER_PROOF = "true";
+    render(
+      <ReportPageContent
+        model={{ status: "not_found", brand: null, model: null }}
+        payment={payment}
+        sellerProof={{
+          requested: true,
+          respondedAt: new Date("2026-10-12T12:00:00.000Z"),
+          proofId: "2bb39cd6-fb82-4bf0-a00d-b744b4409f45",
+          proofMime: "image/jpeg",
+          sellerPhone: "+234 800 000 0000",
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/Seller responded on/)).toBeTruthy();
+    expect(screen.getByText("Seller contact number: +234 800 000 0000")).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "Download seller-submitted photo" }),
+    ).toBeTruthy();
+  });
+
+  it("creates a request link and offers copy and WhatsApp sharing", async () => {
+    process.env.FEATURE_SELLER_PROOF = "true";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          Response.json({ token: "abcdefghijklmnopqrstuvwx" }, { status: 201 }),
+        ),
+      ),
+    );
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    render(
+      <ReportPageContent
+        model={{ status: "not_found", brand: null, model: null }}
+        payment={payment}
+        sellerProof={{
+          requested: false,
+          respondedAt: null,
+          proofId: null,
+          proofMime: null,
+          sellerPhone: null,
+        }}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create Seller Proof request link" }),
+    );
+
+    const link = await screen.findByLabelText("Request link");
+    if (!(link instanceof HTMLInputElement)) {
+      throw new Error("The Seller Proof URL should be shown in an input.");
+    }
+    expect(link.value).toBe(
+      `${window.location.origin}/seller-proof/abcdefghijklmnopqrstuvwx`,
+    );
+    const whatsappLink = screen.getByRole("link", { name: "Share via WhatsApp" });
+    expect(whatsappLink.getAttribute("href")).toContain("https://wa.me/?text=");
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy link" }));
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith(
+        `${window.location.origin}/seller-proof/abcdefghijklmnopqrstuvwx`,
+      );
+    });
   });
 });

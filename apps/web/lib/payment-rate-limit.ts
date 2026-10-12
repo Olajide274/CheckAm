@@ -4,7 +4,12 @@ import { consumePaymentRateLimit } from "@/lib/database";
 export async function enforcePaymentRateLimit(
   request: Request,
   input: {
-    scope: "initialize" | "status";
+    scope:
+      | "initialize"
+      | "status"
+      | "seller-proof-create"
+      | "seller-proof-submit"
+      | "seller-proof-status";
     maxRequests: number;
     windowSeconds: number;
   },

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import ReportPageContent from "@/components/report-page";
-import { getPaymentByReference } from "@/lib/database";
-import { arePaymentsEnabled } from "@/lib/features";
+import { getPaymentByReference, getSellerProofStatus } from "@/lib/database";
+import { arePaymentsEnabled, isSellerProofEnabled } from "@/lib/features";
 import { modelLookup } from "@/lib/model-lookup";
 
 const referencePattern =
@@ -38,7 +38,24 @@ export default async function ReportPage({
     redirect("/");
   }
 
-  const model = await modelLookup.lookup(payment.tac ?? "");
+  const [model, sellerProof] = await Promise.all([
+    modelLookup.lookup(payment.tac ?? ""),
+    isSellerProofEnabled()
+      ? getSellerProofStatus(payment.reference)
+      : Promise.resolve({
+          requested: false,
+          respondedAt: null,
+          proofId: null,
+          proofMime: null,
+          sellerPhone: null,
+        }),
+  ]);
 
-  return <ReportPageContent model={model} payment={payment} />;
+  return (
+    <ReportPageContent
+      model={model}
+      payment={payment}
+      sellerProof={sellerProof}
+    />
+  );
 }

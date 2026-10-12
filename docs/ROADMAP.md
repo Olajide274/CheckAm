@@ -7,8 +7,9 @@ Status key: CURRENT, TODO, BLOCKED, DONE
 ## Step 0: Repo and tooling (DONE)
 Done when: README explains the project; folders exist; docker-compose runs PostgreSQL and Redis; an empty Next.js app and an empty ASP.NET Core solution (four layered projects plus a test project) both build; a GitHub Actions workflow builds and tests both apps on every pull request; .editorconfig and .gitignore are in place.
 
-## Step 1: Landing page deployment (CURRENT)
+## Step 1: Landing page deployment (TODO)
 Done when: a fast, mobile-first landing page with the CheckAm logo; a "Check a phone before you buy" input that validates IMEI format only; a waitlist form saving to PostgreSQL; a "Get the full report, N500" button that only records clicks; a one-question sign-up ("which feature would you use most?"); basic analytics events; deployed.
+Paused for the `step-seller-proof` branch by user authorization; deployment completion remains to be confirmed.
 
 ## Step 1c: Paystack test checkout (DONE)
 Done when: a default-off payment feature flag enables the Preview-only ₦500 test checkout; payment initialization stores a unique pending reference before calling Paystack; raw-body webhook signatures are checked and successful payments are verified server-to-server; a rate-limited status route reports only paid/pending/failed and verifies pending payments; IMEI values are stored only as a keyed hash and last four digits plus the format/Luhn checks; pending payments expire after 30 minutes; and the landing page polls before showing a payment-received message. The report route is server-gated behind `FEATURE_PAYMENTS`, redirects any unpaid or invalid reference to `/`, and keeps the printable report view behind a successful payment only.
@@ -35,8 +36,8 @@ Done when: the public check endpoint and page return only the allowed statuses; 
 ## Step 6: Admin, proof, and disputes (TODO)
 Done when: admin review queue; "Under review" state; dispute workflow with an audit log.
 
-## Step 7: Seller proof link and bill of sale (TODO)
-Done when: buyer sends a link; seller verifies by OTP and uploads proof; shareable bill of sale PDF.
+## Step 7: Paid report and Seller Proof (CURRENT)
+Done when: the free IMEI result states that format/Luhn checks do not identify the model or indicate user reports and links to the ₦500 report; successful payment unlocks the TAC brand/model result, the Bill of Sale generator, and Seller Proof controls; a paid buyer can create, copy, and share a unique Seller Proof request link; the seller can submit a receipt/device photo and optional contact number; only one response is accepted per link; the payment-gated report shows the response time and submitted photo; private contact details are not exposed outside the paid report; every result includes the required disclaimer; and feature-flag, payment-gating, upload-validation, and UI tests pass.
 
 ## Step 8: Payments (TODO)
 Done when: 3 free checks per verified number; wallet and bundles through Paystack or Flutterwave; webhooks are idempotent; reconciliation report.

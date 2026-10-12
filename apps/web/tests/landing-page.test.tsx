@@ -93,8 +93,15 @@ describe("landing page", () => {
     fireEvent.click(screen.getByRole("button", { name: "Check IMEI" }));
 
     expect(
-      await screen.findByText("IMEI looks valid – full report coming soon"),
+      await screen.findByText(
+        "IMEI format looks valid. This does not tell you the brand/model or whether the phone has been reported. Unlock the full report (₦500) for model match, bill of sale, and seller proof request.",
+      ),
     ).toBeDefined();
+    expect(
+      screen.getAllByText(
+        "This result is based on information reported by users. It is not proof of ownership, legality or safety.",
+      ),
+    ).toHaveLength(2);
     expect(fetch).toHaveBeenCalledWith(
       "/api/analytics",
       expect.objectContaining({

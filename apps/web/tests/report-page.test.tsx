@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ReportPage from "@/app/report/[reference]/page";
-import { getPaymentByReference } from "@/lib/database";
+import { getPaymentByReference, getSellerProofStatus } from "@/lib/database";
 import { modelLookup } from "@/lib/model-lookup";
 
 vi.mock("@/lib/database", () => ({
   getPaymentByReference: vi.fn(),
+  getSellerProofStatus: vi.fn(),
 }));
 
 vi.mock("@/lib/model-lookup", () => ({
@@ -15,6 +16,14 @@ describe("report page gating", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.FEATURE_PAYMENTS = "true";
+    delete process.env.FEATURE_SELLER_PROOF;
+    vi.mocked(getSellerProofStatus).mockResolvedValue({
+      requested: false,
+      respondedAt: null,
+      proofId: null,
+      proofMime: null,
+      sellerPhone: null,
+    });
     vi.mocked(modelLookup.lookup).mockResolvedValue({
       status: "not_found",
       brand: null,
@@ -95,5 +104,6 @@ describe("report page gating", () => {
       brand: null,
       model: null,
     });
+    expect(page.props.sellerProof.requested).toBe(false);
   });
 });

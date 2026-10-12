@@ -93,6 +93,22 @@ async function initializeSchema(client: Pool | PoolClient): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS payment_rate_limits_window_started_at_idx
       ON payment_rate_limits (window_started_at);
+
+    CREATE TABLE IF NOT EXISTS seller_proof_requests (
+      id UUID PRIMARY KEY,
+      payment_reference UUID NOT NULL REFERENCES payments(reference) ON DELETE CASCADE,
+      token_hash CHAR(64) NOT NULL UNIQUE,
+      proof_mime TEXT CHECK (proof_mime IN ('image/jpeg', 'image/png', 'image/webp')),
+      proof_data BYTEA,
+      seller_phone TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      responded_at TIMESTAMPTZ,
+      CHECK ((proof_data IS NULL) = (proof_mime IS NULL)),
+      CHECK ((responded_at IS NULL) = (proof_data IS NULL))
+    );
+
+    CREATE INDEX IF NOT EXISTS seller_proof_requests_payment_created_idx
+      ON seller_proof_requests (payment_reference, created_at DESC);
   `);
 }
 
@@ -157,6 +173,14 @@ export interface PaymentRecord {
   imeiLast4: string | null;
   imeiFormatValid: boolean | null;
   imeiLuhnValid: boolean | null;
+}
+
+export interface SellerProofStatus {
+  requested: boolean;
+  respondedAt: Date | null;
+  proofId: string | null;
+  proofMime: string | null;
+  sellerPhone: string | null;
 }
 
 export async function createPendingPayment(input: {
@@ -233,6 +257,105 @@ export async function getPaymentByReference(
         imeiLuhnValid: payment.imei_luhn_valid,
       }
     : null;
+}
+
+export async function createSellerProofRequest(input: {
+  id: string;
+  paymentReference: string;
+  tokenHash: string;
+}): Promise<boolean> {
+  await ensureSchema();
+  const result = await getPool().query(
+    `INSERT INTO seller_proof_requests (id, payment_reference, token_hash)
+     SELECT $1, reference, $3
+     FROM payments
+     WHERE reference = $2 AND status = 'success'
+     RETURNING id`,
+    [input.id, input.paymentReference, input.tokenHash],
+  );
+  return result.rowCount === 1;
+}
+
+export async function getSellerProofStatus(
+  paymentReference: string,
+): Promise<SellerProofStatus> {
+  await ensureSchema();
+  const result = await getPool().query<{
+    requested: boolean;
+    responded_at: Date | null;
+    proof_id: string | null;
+    proof_mime: string | null;
+    seller_phone: string | null;
+  }>(
+    `SELECT
+       EXISTS (
+         SELECT 1 FROM seller_proof_requests
+         WHERE payment_reference = $1
+       ) AS requested,
+       (SELECT responded_at FROM seller_proof_requests
+        WHERE payment_reference = $1 AND responded_at IS NOT NULL
+        ORDER BY responded_at DESC LIMIT 1) AS responded_at,
+       (SELECT id FROM seller_proof_requests
+        WHERE payment_reference = $1 AND responded_at IS NOT NULL
+        ORDER BY responded_at DESC LIMIT 1) AS proof_id,
+       (SELECT proof_mime FROM seller_proof_requests
+        WHERE payment_reference = $1 AND responded_at IS NOT NULL
+        ORDER BY responded_at DESC LIMIT 1) AS proof_mime,
+       (SELECT seller_phone FROM seller_proof_requests
+        WHERE payment_reference = $1 AND responded_at IS NOT NULL
+        ORDER BY responded_at DESC LIMIT 1) AS seller_phone`,
+    [paymentReference],
+  );
+  const status = result.rows[0];
+  return {
+    requested: status?.requested ?? false,
+    respondedAt: status?.responded_at ?? null,
+    proofId: status?.proof_id ?? null,
+    proofMime: status?.proof_mime ?? null,
+    sellerPhone: status?.seller_phone ?? null,
+  };
+}
+
+export async function submitSellerProof(input: {
+  tokenHash: string;
+  proofMime: "image/jpeg" | "image/png" | "image/webp";
+  proofData: Buffer;
+  sellerPhone: string | null;
+}): Promise<boolean> {
+  await ensureSchema();
+  const result = await getPool().query(
+    `UPDATE seller_proof_requests
+     SET proof_mime = $2,
+         proof_data = $3,
+         seller_phone = $4,
+         responded_at = NOW()
+     WHERE token_hash = $1 AND responded_at IS NULL
+     RETURNING id`,
+    [input.tokenHash, input.proofMime, input.proofData, input.sellerPhone],
+  );
+  return result.rowCount === 1;
+}
+
+export async function getSellerProofFile(input: {
+  paymentReference: string;
+  proofId: string;
+}): Promise<{ mime: string; data: Buffer } | null> {
+  await ensureSchema();
+  const result = await getPool().query<{
+    proof_mime: string;
+    proof_data: Buffer;
+  }>(
+    `SELECT proof_mime, proof_data
+     FROM seller_proof_requests
+     INNER JOIN payments ON payments.reference = seller_proof_requests.payment_reference
+     WHERE payments.reference = $1
+       AND payments.status = 'success'
+       AND seller_proof_requests.id = $2
+       AND seller_proof_requests.responded_at IS NOT NULL`,
+    [input.paymentReference, input.proofId],
+  );
+  const proof = result.rows[0];
+  return proof ? { mime: proof.proof_mime, data: proof.proof_data } : null;
 }
 
 export async function findTacModel(

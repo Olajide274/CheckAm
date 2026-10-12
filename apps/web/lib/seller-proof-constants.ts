@@ -1,0 +1,1 @@
+export const SELLER_PROOF_MAX_FILE_SIZE = 4 * 1024 * 1024;

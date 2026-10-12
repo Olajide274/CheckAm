@@ -178,7 +178,7 @@ export default function Home() {
 
     setImeiMessage(
       isValidImei(imei)
-        ? "IMEI looks valid – full report coming soon"
+        ? "IMEI format looks valid. This does not tell you the brand/model or whether the phone has been reported. Unlock the full report (₦500) for model match, bill of sale, and seller proof request."
         : "Enter a valid 15-digit IMEI and try again.",
     );
   }
@@ -369,6 +369,10 @@ export default function Home() {
               <p className="field-hint">Find it in Settings or dial *#06#.</p>
               <p className="form-message" aria-live="polite">
                 {imeiMessage}
+              </p>
+              <p className="field-hint">
+                This result is based on information reported by users. It is not
+                proof of ownership, legality or safety.
               </p>
             </form>
             <div className="report-callout">

@@ -1,8 +1,9 @@
 # CheckAm web
 
-Mobile-first CheckAm landing page and early-access waitlist. The `/login` and
-`/app` routes currently show a Coming soon page; the OTP implementation remains
-in the repository but is not exposed on the public site.
+Mobile-first CheckAm landing page, paid device report, and early-access
+waitlist. The `/login` and `/app` routes currently show a Coming soon page; the
+OTP implementation remains in the repository but is not exposed on the public
+site.
 
 ## Run locally
 
@@ -20,7 +21,10 @@ For Neon, set `DATABASE_URL` to your Neon connection string. The app creates
 analytics request. To create them in advance, run
 [db/neon-schema.sql](./db/neon-schema.sql) in the Neon SQL Editor.
 
-The IMEI form checks the 15-digit format and Luhn checksum in the browser. It does not run a registry check. The full-report button records interest only in production; the separate Step 1c payment checkout is available only when its feature flag is enabled. A payment success message does not include a device report.
+The free IMEI form checks only the 15-digit format and Luhn checksum in the
+browser. It does not identify the model or check whether a user report exists.
+When payments are enabled, the ₦500 paid report shows the TAC model lookup and
+report status.
 
 ## Bill of sale
 
@@ -35,7 +39,7 @@ FEATURE_BILL_OF_SALE=true npm run dev
 
 Use the print action and choose “Save as PDF” to export the agreement.
 
-## Step 1c payment checkout (Paystack test mode)
+## Paid report (Paystack test mode)
 
 Payments are disabled unless `FEATURE_PAYMENTS=true`. They are always disabled
 when `VERCEL_ENV=production`; enable the flag in Preview only. Use Paystack
@@ -61,12 +65,30 @@ used. Successful webhooks and status checks are cross-checked with Paystack's
 server-side transaction verification endpoint (reference, status, ₦500 amount,
 and NGN currency). Pending payments expire after 30 minutes.
 
-PostgreSQL creates the `payments` and payment rate-limit tables on first use.
-For Neon, run the corresponding statements in `db/neon-schema.sql` in the Neon
-SQL Editor before deployment. The email is stored with its payment only to
-initialize Paystack's transaction and deliver its receipt. An optional device
-identifier is stored as a keyed hash and its last four digits only. The current
-app does not yet generate or expose a full report.
+PostgreSQL creates the `payments`, payment rate-limit, TAC, and Seller Proof
+tables on first use. For Neon, run the corresponding statements in
+`db/neon-schema.sql` in the Neon SQL Editor before deployment. The email is
+stored with its payment only to initialize Paystack's transaction and deliver
+its receipt. An optional device identifier is stored as a keyed hash and its
+last four digits only. The report route and attachment download require a
+successful, confirmed payment; a return from Paystack alone does not unlock
+the report.
+
+## Seller Proof
+
+Seller Proof is disabled by default. Set `FEATURE_SELLER_PROOF=true` alongside
+the Preview-only `FEATURE_PAYMENTS=true` flag to show its controls in a paid
+report. A buyer can create a random, single-use request link, copy it, or open
+a WhatsApp share. The link value is not stored; only its SHA-256 hash is kept
+in PostgreSQL. A seller can submit one JPEG, PNG, or WebP photo up to 4 MB and
+optionally provide a phone number. The photo and optional number are stored in
+PostgreSQL; the paid report shows the response time, offers the photo download,
+and displays the optional number. They are not returned by public endpoints.
+Request creation, status polling, and submission are rate limited.
+
+The seller link is a bearer link: send it only to the intended seller. Seller
+photos and contact numbers are private submission data and should not be
+shared beyond the paid report.
 
 ## Tests
 
