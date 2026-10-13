@@ -37,7 +37,9 @@ Done when: the public check endpoint and page return only the allowed statuses; 
 Done when: admin review queue; "Under review" state; dispute workflow with an audit log.
 
 ## Step 7: Paid report and Seller Proof (CURRENT)
-Done when: the free IMEI result states that format/Luhn checks do not identify the model or indicate user reports and links to the ₦500 report; successful payment unlocks the TAC brand/model result, the Bill of Sale generator, and Seller Proof controls; a paid buyer can create, copy, and share a unique Seller Proof request link; the seller can submit a receipt/device photo and optional contact number; only one response is accepted per link; the payment-gated report shows the response time and submitted photo; private contact details are not exposed outside the paid report; every result includes the required disclaimer; and feature-flag, payment-gating, upload-validation, and UI tests pass.
+Done when: the free IMEI result states that format/Luhn checks do not identify the model or indicate user reports and links to the ₦500 report; successful payment unlocks the TAC brand/model result, the Bill of Sale generator, and Seller Proof controls; a paid buyer can create, copy, and share a unique Seller Proof request link; the seller can submit one receipt/device photo without collecting a phone number; the payment-gated report shows the response time and submitted photo only for the successful payment the proof belongs to; uploads are decoded, rotated, stripped of metadata, resized to at most 1600 pixels, and re-encoded as JPEG at quality 80 with a 2 MB cap; attachment data and MIME types are deleted 30 days after response; every result includes the required disclaimer; and authorization, upload-validation, retention, feature-flag, payment-gating, and UI tests pass.
+
+Step 1e hardening (DONE): Seller Proof authorization, phone-number removal, image processing, 30-day retention, tests, and README guidance are included in this step.
 
 ## Step 8: Payments (TODO)
 Done when: 3 free checks per verified number; wallet and bundles through Paystack or Flutterwave; webhooks are idempotent; reconciliation report.

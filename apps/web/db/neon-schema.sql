@@ -78,12 +78,13 @@ CREATE TABLE IF NOT EXISTS seller_proof_requests (
   token_hash CHAR(64) NOT NULL UNIQUE,
   proof_mime TEXT CHECK (proof_mime IN ('image/jpeg', 'image/png', 'image/webp')),
   proof_data BYTEA,
-  seller_phone TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   responded_at TIMESTAMPTZ,
-  CHECK ((proof_data IS NULL) = (proof_mime IS NULL)),
-  CHECK ((responded_at IS NULL) = (proof_data IS NULL))
+  CHECK ((proof_data IS NULL) = (proof_mime IS NULL))
 );
+
+ALTER TABLE seller_proof_requests
+  DROP COLUMN IF EXISTS seller_phone;
 
 CREATE INDEX IF NOT EXISTS seller_proof_requests_payment_created_idx
   ON seller_proof_requests (payment_reference, created_at DESC);

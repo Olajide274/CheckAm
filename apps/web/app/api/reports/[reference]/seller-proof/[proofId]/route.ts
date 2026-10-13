@@ -18,25 +18,25 @@ export async function GET(
   }: { params: Promise<{ reference: string; proofId: string }> },
 ) {
   if (!arePaymentsEnabled() || !isSellerProofEnabled()) {
-    return Response.json({ error: "Seller Proof is unavailable." }, { status: 404 });
+    return new Response(null, { status: 404 });
   }
 
   try {
     const { reference, proofId } = await params;
     if (!referencePattern.test(reference) || !idPattern.test(proofId)) {
-      return Response.json({ error: "Proof not found." }, { status: 404 });
+      return new Response(null, { status: 404 });
     }
 
     const payment = await getPaymentByReference(reference);
     if (!payment || payment.status !== "success") {
-      return Response.json({ error: "Proof not found." }, { status: 404 });
+      return new Response(null, { status: 404 });
     }
 
     const proof = await getSellerProofFile({
       paymentReference: reference,
       proofId,
     });
-    if (!proof) return Response.json({ error: "Proof not found." }, { status: 404 });
+    if (!proof) return new Response(null, { status: 404 });
 
     return new Response(new Uint8Array(proof.data), {
       headers: {

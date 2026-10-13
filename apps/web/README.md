@@ -74,21 +74,62 @@ last four digits only. The report route and attachment download require a
 successful, confirmed payment; a return from Paystack alone does not unlock
 the report.
 
+## TAC model data
+
+TAC imports write to the same PostgreSQL `tac_models` table used by the paid
+report. The Osmocom importer expects its license line followed by
+`tac,name,name,...`; the first `name` is mapped to brand and the second to
+model. The supplement importer expects `tac,brand,model` and optionally a
+`source` column. Both validate eight-digit TACs and non-empty brand/model
+values, skip invalid rows, report row counts, and upsert by TAC. Duplicate TACs
+inside one file use the last valid row. A supplement row takes precedence over
+an Osmocom row regardless of import order; a later supplement import replaces
+an earlier supplement row.
+
+Set `DATABASE_URL` to the same PostgreSQL connection string used by the
+application, then run from `apps/web`. Replace the placeholder with the
+database's connection string; do not commit it:
+
+```bash
+cd apps/web
+export DATABASE_URL='postgresql://USER:PASSWORD@HOST:5432/DATABASE'
+npm run import:tac -- data/tac.csv
+npm run import:tac:supplement -- data/tac-supplement.csv
+```
+
+The file arguments are optional. The first command defaults to
+`data/tac.csv`; the second defaults to `data/tac-supplement.csv`. Files in
+`apps/web/data/` are excluded from Git; keep source datasets out of commits and
+record each supplemental dataset's attribution in its `source` column.
+
+The Osmocom-style data is open reference data attributed to the Osmocom TAC
+database under CC-BY-SA 3.0. This is not the complete GSMA TAC database, and
+neither the reference data nor the supplement is guaranteed to include every
+model sold in Nigeria. A missing match means only that this database has no
+usable model entry for the submitted TAC.
+
 ## Seller Proof
 
 Seller Proof is disabled by default. Set `FEATURE_SELLER_PROOF=true` alongside
 the Preview-only `FEATURE_PAYMENTS=true` flag to show its controls in a paid
 report. A buyer can create a random, single-use request link, copy it, or open
 a WhatsApp share. The link value is not stored; only its SHA-256 hash is kept
-in PostgreSQL. A seller can submit one JPEG, PNG, or WebP photo up to 4 MB and
-optionally provide a phone number. The photo and optional number are stored in
-PostgreSQL; the paid report shows the response time, offers the photo download,
-and displays the optional number. They are not returned by public endpoints.
-Request creation, status polling, and submission are rate limited.
+in PostgreSQL. A seller can submit one JPEG, PNG, or WebP photo up to 2 MB.
+Uploads must decode successfully; they are auto-rotated, stripped of metadata,
+resized to at most 1600 pixels on the long side, and re-encoded as JPEG at
+quality 80. Seller phone numbers are not collected or stored. The paid report
+shows the response time and offers the photo download only to the payment that
+owns it. Request creation, status polling, and submission are rate limited.
 
-The seller link is a bearer link: send it only to the intended seller. Seller
-photos and contact numbers are private submission data and should not be
-shared beyond the paid report.
+The seller link is a bearer link: send it only to the intended seller.
+Attachments are deleted 30 days after the seller responds. Schedule
+`npm run purge:seller-proof` to run daily from `apps/web`, with `DATABASE_URL`
+set in the scheduler's protected environment. For example, a server cron can
+run:
+
+```cron
+17 2 * * * cd /path/to/CheckAm/apps/web && npm run purge:seller-proof
+```
 
 ## Tests
 

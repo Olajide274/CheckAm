@@ -39,7 +39,6 @@ export async function GET(
         proofUrl: status.proofId
           ? `/api/reports/${encodeURIComponent(reference)}/seller-proof/${encodeURIComponent(status.proofId)}`
           : null,
-        sellerPhone: status.sellerPhone,
       },
       { headers: { "Cache-Control": "no-store" } },
     );

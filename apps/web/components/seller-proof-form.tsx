@@ -4,7 +4,6 @@ import { useState, type FormEvent } from "react";
 import { SELLER_PROOF_MAX_FILE_SIZE } from "@/lib/seller-proof-constants";
 
 export default function SellerProofForm({ token }: { token: string }) {
-  const [phone, setPhone] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -22,7 +21,7 @@ export default function SellerProofForm({ token }: { token: string }) {
       typeof file === "string" ||
       file.size > SELLER_PROOF_MAX_FILE_SIZE
     ) {
-      setError("Choose a photo no larger than 4 MB.");
+      setError("Choose a photo no larger than 2 MB.");
       return;
     }
 
@@ -52,7 +51,6 @@ export default function SellerProofForm({ token }: { token: string }) {
 
       setMessage("Your photo was sent to the buyer. Thank you.");
       form.reset();
-      setPhone("");
     } catch (submitError) {
       console.error("Seller Proof submission failed.", submitError);
       setError(
@@ -83,20 +81,8 @@ export default function SellerProofForm({ token }: { token: string }) {
             required
             type="file"
           />
-          <label htmlFor="seller-proof-phone">
-            Phone number <span>(optional, shared with the buyer)</span>
-          </label>
-          <input
-            autoComplete="tel"
-            id="seller-proof-phone"
-            maxLength={32}
-            name="phone"
-            onChange={(event) => setPhone(event.target.value)}
-            type="tel"
-            value={phone}
-          />
           <p className="field-hint">
-            JPEG, PNG, or WebP only. Maximum file size: 4 MB.
+            JPEG, PNG, or WebP only. Maximum file size: 2 MB.
           </p>
           <button className="report-button" disabled={isSubmitting} type="submit">
             {isSubmitting ? "Sending photo…" : "Send photo to buyer"}

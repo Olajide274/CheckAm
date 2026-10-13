@@ -47,7 +47,6 @@ export default async function ReportPage({
           respondedAt: null,
           proofId: null,
           proofMime: null,
-          sellerPhone: null,
         }),
   ]);
 

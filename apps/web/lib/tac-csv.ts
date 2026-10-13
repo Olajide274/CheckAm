@@ -2,6 +2,7 @@ export interface TacCsvRow {
   tac: string;
   brand: string;
   model: string;
+  source?: string;
 }
 
 export interface ParsedTacCsv {
@@ -105,6 +106,34 @@ export function parseTacCsv(contents: string): ParsedTacCsv {
     throw new Error("TAC CSV header must begin with tac,name,name columns.");
   }
 
+  return parseTacRows(records);
+}
+
+export function parseTacSupplementCsv(contents: string): ParsedTacCsv {
+  const records = parseCsvRecords(contents.replace(/^\uFEFF/, ""));
+  const header = records.shift();
+  if (
+    !header ||
+    header.invalid ||
+    header.fields[0]?.trim().toLowerCase() !== "tac" ||
+    header.fields[1]?.trim().toLowerCase() !== "brand" ||
+    header.fields[2]?.trim().toLowerCase() !== "model" ||
+    header.fields.length > 4 ||
+    (header.fields.length > 3 &&
+      header.fields[3]?.trim().toLowerCase() !== "source")
+  ) {
+    throw new Error(
+      "TAC supplement CSV header must be tac,brand,model with optional source.",
+    );
+  }
+
+  return parseTacRows(records, true);
+}
+
+function parseTacRows(
+  records: CsvRecord[],
+  includeSource = false,
+): ParsedTacCsv {
   const uniqueRows = new Map<string, TacCsvRow>();
   let duplicateRows = 0;
   let invalidRows = 0;
@@ -118,13 +147,24 @@ export function parseTacCsv(contents: string): ParsedTacCsv {
     const tac = record.fields[0]?.trim() ?? "";
     const brand = record.fields[1]?.trim() ?? "";
     const model = record.fields[2]?.trim() ?? "";
-    if (!/^\d{8}$/.test(tac) || !brand || !model) {
+    const source = record.fields[3]?.trim() ?? "";
+    if (
+      !/^\d{8}$/.test(tac) ||
+      !brand ||
+      !model ||
+      (includeSource && source.length > 500)
+    ) {
       invalidRows += 1;
       continue;
     }
 
     if (uniqueRows.has(tac)) duplicateRows += 1;
-    uniqueRows.set(tac, { tac, brand, model });
+    uniqueRows.set(tac, {
+      tac,
+      brand,
+      model,
+      ...(includeSource && source ? { source } : {}),
+    });
   }
 
   return {

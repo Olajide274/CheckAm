@@ -11,7 +11,6 @@ interface ClientSellerProofStatus {
   requested: boolean;
   respondedAt: string | null;
   proofUrl: string | null;
-  sellerPhone: string | null;
 }
 
 export default function ReportPageContent({
@@ -31,7 +30,6 @@ export default function ReportPageContent({
       proofUrl: sellerProof.proofId
         ? `/api/reports/${encodeURIComponent(payment.reference)}/seller-proof/${encodeURIComponent(sellerProof.proofId)}`
         : null,
-      sellerPhone: sellerProof.sellerPhone,
     }));
   const [sellerProofLink, setSellerProofLink] = useState("");
   const [sellerProofMessage, setSellerProofMessage] = useState("");
@@ -72,9 +70,7 @@ export default function ReportPageContent({
           !("respondedAt" in result) ||
           !(typeof result.respondedAt === "string" || result.respondedAt === null) ||
           !("proofUrl" in result) ||
-          !(typeof result.proofUrl === "string" || result.proofUrl === null) ||
-          !("sellerPhone" in result) ||
-          !(typeof result.sellerPhone === "string" || result.sellerPhone === null)
+          !(typeof result.proofUrl === "string" || result.proofUrl === null)
         ) {
           throw new Error("Unable to refresh Seller Proof status.");
         }
@@ -84,7 +80,6 @@ export default function ReportPageContent({
           requested: result.requested,
           respondedAt: result.respondedAt,
           proofUrl: result.proofUrl,
-          sellerPhone: result.sellerPhone,
         });
         setSellerProofError("");
         if (!result.respondedAt) {
@@ -199,7 +194,7 @@ export default function ReportPageContent({
               <strong>{model.brand}</strong> {model.model}
             </p>
           ) : (
-            <p>Model not found in our database</p>
+            <p>No model match is available for this TAC in our database.</p>
           )}
           <p>
             Model codes can be wrong or out of date. This does not confirm the
@@ -349,9 +344,6 @@ export default function ReportPageContent({
                       </strong>
                       .
                     </p>
-                    {sellerProofStatus.sellerPhone && (
-                      <p>Seller contact number: {sellerProofStatus.sellerPhone}</p>
-                    )}
                     {sellerProofStatus.proofUrl && (
                       <a
                         className="report-action-link"
@@ -378,9 +370,6 @@ export default function ReportPageContent({
             )}
           </section>
         )}
-        <footer className="report-footer">
-          Model data: Osmocom TAC database, CC-BY-SA 3.0
-        </footer>
       </div>
     </main>
   );

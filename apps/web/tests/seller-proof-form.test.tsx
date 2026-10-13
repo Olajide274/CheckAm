@@ -7,7 +7,7 @@ afterEach(() => {
 });
 
 describe("Seller Proof form", () => {
-  it("submits a receipt photo and optional phone and confirms success", async () => {
+  it("submits a receipt photo without seller contact details and confirms success", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       Response.json({ received: true }, { status: 201 }),
     );
@@ -21,9 +21,6 @@ describe("Seller Proof form", () => {
     );
     fireEvent.change(screen.getByLabelText("Receipt or device photo"), {
       target: { files: [photo] },
-    });
-    fireEvent.change(screen.getByLabelText(/Phone number/), {
-      target: { value: "+234 800 000 0000" },
     });
     const form = screen.getByRole("button", { name: "Send photo to buyer" }).closest("form");
     if (!form) throw new Error("Seller Proof form was not rendered.");
@@ -40,7 +37,7 @@ describe("Seller Proof form", () => {
     if (!(requestBody instanceof FormData)) {
       throw new Error("Seller Proof form should submit multipart form data.");
     }
-    expect(requestBody.get("phone")).toBe("+234 800 000 0000");
+    expect([...requestBody.keys()]).toEqual(["proof"]);
     expect(requestBody.get("proof")).not.toBeNull();
     expect(
       screen.getByText(

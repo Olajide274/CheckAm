@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# Large TAC dumps (import locally; do not commit)
+data/tac_full_moaz.csv
+data/tac-supplement.csv
+data/tac.csv

@@ -1,0 +1,6 @@
+tac,brand,model,source
+12345678,Acme,Aster 1,Local test source
+12345678,Acme,Aster 1 Plus,Local test source
+87654321,Example Mobile,Model Two,
+1234,Invalid,Short TAC,
+99999999,,Missing brand,

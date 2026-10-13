@@ -22,7 +22,6 @@ describe("report page gating", () => {
       respondedAt: null,
       proofId: null,
       proofMime: null,
-      sellerPhone: null,
     });
     vi.mocked(modelLookup.lookup).mockResolvedValue({
       status: "not_found",

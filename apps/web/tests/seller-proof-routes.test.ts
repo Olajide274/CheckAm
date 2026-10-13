@@ -2,6 +2,7 @@
 
 import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import sharp from "sharp";
 import { POST as createRequest } from "@/app/api/reports/[reference]/seller-proof/route";
 import { GET as downloadProof } from "@/app/api/reports/[reference]/seller-proof/[proofId]/route";
 import { POST as submitProof } from "@/app/api/seller-proof/[token]/route";
@@ -127,11 +128,22 @@ describe("Seller Proof request creation", () => {
 });
 
 describe("Seller Proof response submission", () => {
-  it("stores an allowed receipt photo and optional seller phone against the hashed link", async () => {
+  it("rotates, resizes, strips metadata, and stores the photo as JPEG", async () => {
+    const imageData = await sharp({
+      create: {
+        width: 2000,
+        height: 1000,
+        channels: 3,
+        background: "#336699",
+      },
+    })
+      .withMetadata({ orientation: 6 })
+      .jpeg()
+      .toBuffer();
     const image = new File(
-      [new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])],
-      "receipt.png",
-      { type: "image/png" },
+      [imageData],
+      "receipt.jpg",
+      { type: "image/jpeg" },
     );
     const form = new FormData();
     form.set("proof", image);
@@ -147,10 +159,21 @@ describe("Seller Proof response submission", () => {
     expect(response.status, await response.clone().text()).toBe(201);
     expect(submitSellerProof).toHaveBeenCalledWith({
       tokenHash: createHash("sha256").update(token).digest("hex"),
-      proofMime: "image/png",
-      proofData: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-      sellerPhone: "+234 800 000 0000",
+      proofMime: "image/jpeg",
+      proofData: expect.any(Buffer),
     });
+
+    const proofData = vi.mocked(submitSellerProof).mock.calls[0]?.[0].proofData;
+    if (!proofData) throw new Error("The processed photo was not saved.");
+    const metadata = await sharp(proofData).metadata();
+    expect(metadata.format).toBe("jpeg");
+    expect(metadata.width).toBe(800);
+    expect(metadata.height).toBe(1600);
+    expect(metadata.orientation).toBeUndefined();
+    expect(metadata.exif).toBeUndefined();
+    expect(metadata.icc).toBeUndefined();
+    expect(metadata.iptc).toBeUndefined();
+    expect(metadata.xmp).toBeUndefined();
   });
 
   it("rejects mismatched image content before saving it", async () => {
@@ -169,6 +192,46 @@ describe("Seller Proof response submission", () => {
     expect(submitSellerProof).not.toHaveBeenCalled();
   });
 
+  it("rejects image data that has a supported signature but cannot be decoded", async () => {
+    const image = new File(
+      [new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])],
+      "photo.png",
+      { type: "image/png" },
+    );
+    const form = new FormData();
+    form.set("proof", image);
+    const response = await submitProof(
+      new Request(`http://localhost/api/seller-proof/${token}`, {
+        method: "POST",
+        body: form,
+      }),
+      { params: Promise.resolve({ token }) },
+    );
+
+    expect(response.status).toBe(400);
+    expect(submitSellerProof).not.toHaveBeenCalled();
+  });
+
+  it("rejects uploads larger than 2 MB", async () => {
+    const image = new File(
+      [new Uint8Array(2 * 1024 * 1024 + 1)],
+      "photo.jpg",
+      { type: "image/jpeg" },
+    );
+    const form = new FormData();
+    form.set("proof", image);
+    const response = await submitProof(
+      new Request(`http://localhost/api/seller-proof/${token}`, {
+        method: "POST",
+        body: form,
+      }),
+      { params: Promise.resolve({ token }) },
+    );
+
+    expect(response.status).toBe(413);
+    expect(submitSellerProof).not.toHaveBeenCalled();
+  });
+
   it("does not return an attachment unless its report has successful payment", async () => {
     vi.mocked(getPaymentByReference).mockResolvedValue(payment("pending"));
     const response = await downloadProof(
@@ -177,6 +240,32 @@ describe("Seller Proof response submission", () => {
     );
 
     expect(response.status).toBe(404);
+    expect(await response.text()).toBe("");
     expect(getSellerProofFile).not.toHaveBeenCalled();
+  });
+
+  it("does not return another payment's proof", async () => {
+    const otherReference = "3bb39cd6-fb82-4bf0-a00d-b744b4409f44";
+    const otherPaymentProof = {
+      paymentReference: otherReference,
+      mime: "image/jpeg",
+      data: Buffer.from("private photo"),
+    };
+    vi.mocked(getSellerProofFile).mockImplementation(async ({ paymentReference }) =>
+      paymentReference === otherPaymentProof.paymentReference
+        ? { mime: otherPaymentProof.mime, data: otherPaymentProof.data }
+        : null,
+    );
+    const response = await downloadProof(
+      new Request(`http://localhost/api/reports/${reference}/seller-proof/${proofId}`),
+      { params: Promise.resolve({ reference, proofId }) },
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.text()).toBe("");
+    expect(getSellerProofFile).toHaveBeenCalledWith({
+      paymentReference: reference,
+      proofId,
+    });
   });
 });

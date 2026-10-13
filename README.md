@@ -30,6 +30,24 @@ local `tac_models` table. Payment records store the TAC, not the full IMEI.
 Seller descriptions are compared using normalized word tokens; partial overlap
 is reported as inconclusive.
 
+## Seller Proof attachments
+
+Seller Proof is enabled only when `FEATURE_PAYMENTS=true` and
+`FEATURE_SELLER_PROOF=true`. Sellers can submit one JPEG, PNG, or WebP image,
+up to 2 MB. Uploads are decoded, auto-rotated, stripped of metadata, resized
+to at most 1600 pixels on the long side, and re-encoded as JPEG at quality 80.
+Seller phone numbers are not collected or stored. Attachments are available
+only in the successful payment report they belong to.
+
+Attachment data and MIME types are deleted 30 days after the seller responds.
+Schedule `npm run purge:seller-proof` to run daily from `apps/web`, with
+`DATABASE_URL` configured in the scheduler's protected environment. For
+example, a server cron can run:
+
+```cron
+17 2 * * * cd /path/to/CheckAm/apps/web && npm run purge:seller-proof
+```
+
 To load an Osmocom TAC CSV with `tac`, `brand`, and `model` columns, place it at
 `apps/web/data/tac.csv` and run `npm run import:tac` from `apps/web` with
 `DATABASE_URL` set. The data directory is ignored by Git. Imports skip invalid

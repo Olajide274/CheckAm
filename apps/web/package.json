@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "import:tac": "tsx scripts/import-tac.ts",
+    "import:tac:supplement": "tsx scripts/import-tac.ts --supplement",
+    "purge:seller-proof": "tsx scripts/purge-seller-proof.ts",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -16,7 +18,8 @@
     "next": "16.4.0",
     "pg": "^8.23.1",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",

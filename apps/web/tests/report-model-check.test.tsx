@@ -52,7 +52,6 @@ describe("report model code check", () => {
           respondedAt: null,
           proofId: null,
           proofMime: null,
-          sellerPhone: null,
         }}
       />,
     );
@@ -76,9 +75,6 @@ describe("report model code check", () => {
     expect(
       screen.getByText("Matches the seller's description"),
     ).toBeTruthy();
-    expect(
-      screen.getByText("Model data: Osmocom TAC database, CC-BY-SA 3.0"),
-    ).toBeTruthy();
   });
 
   it("shows the message when no TAC entry exists", () => {
@@ -91,15 +87,18 @@ describe("report model code check", () => {
           respondedAt: null,
           proofId: null,
           proofMime: null,
-          sellerPhone: null,
         }}
       />,
     );
 
-    expect(screen.getByText("Model not found in our database")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "No model match is available for this TAC in our database.",
+      ),
+    ).toBeTruthy();
   });
 
-  it("shows a Seller Proof response timestamp and private buyer contact", () => {
+  it("shows a Seller Proof response timestamp and photo link", () => {
     process.env.FEATURE_SELLER_PROOF = "true";
     render(
       <ReportPageContent
@@ -110,13 +109,11 @@ describe("report model code check", () => {
           respondedAt: new Date("2026-10-12T12:00:00.000Z"),
           proofId: "2bb39cd6-fb82-4bf0-a00d-b744b4409f45",
           proofMime: "image/jpeg",
-          sellerPhone: "+234 800 000 0000",
         }}
       />,
     );
 
     expect(screen.getByText(/Seller responded on/)).toBeTruthy();
-    expect(screen.getByText("Seller contact number: +234 800 000 0000")).toBeTruthy();
     expect(
       screen.getByRole("link", { name: "Download seller-submitted photo" }),
     ).toBeTruthy();
@@ -126,9 +123,16 @@ describe("report model code check", () => {
     process.env.FEATURE_SELLER_PROOF = "true";
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockImplementation(() =>
+      vi.fn((_input: RequestInfo | URL, init?: RequestInit) =>
         Promise.resolve(
-          Response.json({ token: "abcdefghijklmnopqrstuvwx" }, { status: 201 }),
+          init?.method === "POST"
+            ? Response.json(
+                { token: "abcdefghijklmnopqrstuvwx" },
+                { status: 201 },
+              )
+            : Response.json(
+                { requested: true, respondedAt: null, proofUrl: null },
+              ),
         ),
       ),
     );
@@ -146,7 +150,6 @@ describe("report model code check", () => {
           respondedAt: null,
           proofId: null,
           proofMime: null,
-          sellerPhone: null,
         }}
       />,
     );
