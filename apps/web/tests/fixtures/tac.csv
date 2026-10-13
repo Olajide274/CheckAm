@@ -1,6 +1,7 @@
-tac,brand,model
-12345678,"Acme, Inc.","Aster 1"
-12345678,Acme,Aster 1 Plus
-"87654321","Brand ""Two""","Model, Pro"
-1234,Wrong,Short
-99999999,,Missing
+Osmocom TAC database license
+tac,name,name,contributor,comment,gsmarena,gsmarena,aka
+12345678,"Acme, Inc.","Aster 1",Contributor,Comment,Acme Aster 1,Acme Aster 1,
+12345678,Acme,Aster 1 Plus,Contributor,Comment,Acme Aster 1 Plus,Acme Aster 1 Plus,
+"87654321","Brand ""Two""","Model, Pro",Contributor,Comment,Brand Two Model Pro,Brand Two Model Pro,
+1234,Wrong,Short,Contributor,Comment,,,
+99999999,,Missing,Contributor,Comment,,,

@@ -8,8 +8,6 @@ import {
 import { SELLER_PROOF_MAX_FILE_SIZE } from "@/lib/seller-proof-constants";
 import { submitSellerProof } from "@/lib/database";
 
-export const runtime = "nodejs";
-
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ token: string }> },

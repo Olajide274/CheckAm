@@ -51,7 +51,7 @@ export async function importTacCsv(csvPath: string): Promise<void> {
       }
       await client.query("COMMIT");
       console.info(
-        `TAC import complete: ${parsed.totalRows} rows read, ${parsed.rows.length} unique valid rows upserted, ${parsed.duplicateRows} duplicate rows, ${parsed.invalidRows} invalid rows.`,
+        `TAC import complete: imported ${parsed.rows.length}, skipped ${parsed.invalidRows}, duplicates ${parsed.duplicateRows}.`,
       );
     } catch (error) {
       await client.query("ROLLBACK");

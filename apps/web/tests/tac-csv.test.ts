@@ -9,7 +9,7 @@ const fixture = readFileSync(
 );
 
 describe("TAC CSV import parsing", () => {
-  it("parses quoted fields, keeps the last valid duplicate, and skips invalid rows", () => {
+  it("skips the license line, maps duplicate name columns by position, and ignores trailing columns", () => {
     const parsed = parseTacCsv(fixture);
 
     expect(parsed.totalRows).toBe(5);
@@ -22,8 +22,8 @@ describe("TAC CSV import parsing", () => {
   });
 
   it("rejects files without the required columns", () => {
-    expect(() => parseTacCsv("tac,brand\n12345678,Acme")).toThrow(
-      "TAC CSV header must include tac, brand, and model columns.",
+    expect(() => parseTacCsv("License terms\ntac,brand\n12345678,Acme")).toThrow(
+      "TAC CSV header must begin with tac,name,name columns.",
     );
   });
 });

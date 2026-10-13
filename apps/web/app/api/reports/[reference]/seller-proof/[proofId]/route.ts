@@ -38,7 +38,7 @@ export async function GET(
     });
     if (!proof) return Response.json({ error: "Proof not found." }, { status: 404 });
 
-    return new Response(proof.data, {
+    return new Response(new Uint8Array(proof.data), {
       headers: {
         "Cache-Control": "private, no-store",
         "Content-Disposition": `attachment; filename="seller-proof.${extensions[proof.mime]}"`,

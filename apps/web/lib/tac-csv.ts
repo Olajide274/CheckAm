@@ -93,17 +93,16 @@ function parseCsvRecords(contents: string): CsvRecord[] {
 
 export function parseTacCsv(contents: string): ParsedTacCsv {
   const records = parseCsvRecords(contents.replace(/^\uFEFF/, ""));
+  records.shift();
   const header = records.shift();
-  if (!header || header.invalid) {
-    throw new Error("TAC CSV must include a valid header row.");
-  }
-
-  const columns = header.fields.map((field) => field.trim().toLowerCase());
-  const tacIndex = columns.indexOf("tac");
-  const brandIndex = columns.indexOf("brand");
-  const modelIndex = columns.indexOf("model");
-  if (tacIndex < 0 || brandIndex < 0 || modelIndex < 0) {
-    throw new Error("TAC CSV header must include tac, brand, and model columns.");
+  if (
+    !header ||
+    header.invalid ||
+    header.fields[0]?.trim().toLowerCase() !== "tac" ||
+    header.fields[1]?.trim().toLowerCase() !== "name" ||
+    header.fields[2]?.trim().toLowerCase() !== "name"
+  ) {
+    throw new Error("TAC CSV header must begin with tac,name,name columns.");
   }
 
   const uniqueRows = new Map<string, TacCsvRow>();
@@ -111,14 +110,14 @@ export function parseTacCsv(contents: string): ParsedTacCsv {
   let invalidRows = 0;
 
   for (const record of records) {
-    if (record.invalid || record.fields.length !== columns.length) {
+    if (record.invalid || record.fields.length < 3) {
       invalidRows += 1;
       continue;
     }
 
-    const tac = record.fields[tacIndex]?.trim() ?? "";
-    const brand = record.fields[brandIndex]?.trim() ?? "";
-    const model = record.fields[modelIndex]?.trim() ?? "";
+    const tac = record.fields[0]?.trim() ?? "";
+    const brand = record.fields[1]?.trim() ?? "";
+    const model = record.fields[2]?.trim() ?? "";
     if (!/^\d{8}$/.test(tac) || !brand || !model) {
       invalidRows += 1;
       continue;

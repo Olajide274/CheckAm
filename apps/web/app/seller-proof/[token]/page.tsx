@@ -4,6 +4,8 @@ import SellerProofForm from "@/components/seller-proof-form";
 import { arePaymentsEnabled, isSellerProofEnabled } from "@/lib/features";
 import { isSellerProofToken } from "@/lib/seller-proof";
 
+export const instant = false;
+
 export const metadata: Metadata = {
   robots: {
     index: false,
