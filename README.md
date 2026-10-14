@@ -97,6 +97,27 @@ Development and does not send a message.
    needed for these web tables. Verify the landing page, submit a test signup,
    and confirm the analytics and signup records in the database.
 
+### Production payments launch checklist
+
+- Keep `FEATURE_PAYMENTS` unset or `false` by default; enable it explicitly
+  only after completing this checklist.
+- Confirm the Vercel project is on Pro and its production environment has both
+  `APP_ENV=production` and `VERCEL_ENV=production`.
+- Configure `PAYSTACK_SECRET_KEY` as a server-only live key
+  (`sk_live_...`) in Vercel Production. Live keys are rejected unless both
+  environment markers are production; test keys are rejected in production.
+- Set Paystack's live webhook URL to
+  `https://<production-domain>/api/payments/webhook`.
+- Run the idempotent schema upgrade in
+  [`apps/web/db/neon-schema.sql`](apps/web/db/neon-schema.sql), or confirm the
+  first-use application upgrade has created/added all payment, TAC, rate-limit,
+  and Seller Proof tables and columns.
+- Import the production TAC datasets and preserve attribution with
+  `npm run import:tac` and `npm run import:tac:supplement` from `apps/web`.
+- Complete a controlled payment/webhook check and reconcile using
+  `npm run payments:summary` from `apps/web`; its output contains only
+  aggregates, never emails or IMEIs.
+
 `DATABASE_URL` is required for waitlist submissions and analytics. The public
 landing page can render without it, but those persistence requests will fail
 until it is configured.

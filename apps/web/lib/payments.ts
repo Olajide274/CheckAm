@@ -28,13 +28,37 @@ export class PaymentFlowError extends Error {
 
 function getPaystackSecretKey(): string {
   const secret = process.env.PAYSTACK_SECRET_KEY;
-  if (!secret?.startsWith("sk_test_")) {
+  const isProduction =
+    process.env.APP_ENV === "production" ||
+    process.env.VERCEL_ENV === "production";
+
+  if (secret?.startsWith("sk_live_")) {
+    if (
+      process.env.APP_ENV !== "production" ||
+      process.env.VERCEL_ENV !== "production"
+    ) {
+      throw new PaymentFlowError(
+        "Live Paystack credentials require both environments to be production.",
+        503,
+      );
+    }
+    console.info("Paystack payment mode: live.");
+    return secret;
+  }
+
+  if (secret?.startsWith("sk_test_") && !isProduction) {
+    console.info("Paystack payment mode: test.");
+    return secret;
+  }
+
+  if (secret?.startsWith("sk_test_")) {
     throw new PaymentFlowError(
-      "Paystack test credentials are not configured.",
+      "Paystack test credentials cannot be used in production.",
       503,
     );
   }
-  return secret;
+
+  throw new PaymentFlowError("Paystack credentials are not configured.", 503);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

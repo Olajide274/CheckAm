@@ -39,13 +39,16 @@ FEATURE_BILL_OF_SALE=true npm run dev
 
 Use the print action and choose “Save as PDF” to export the agreement.
 
-## Paid report (Paystack test mode)
+## Paid report (Paystack)
 
-Payments are disabled unless `FEATURE_PAYMENTS=true`. They are always disabled
-when `VERCEL_ENV=production`; enable the flag in Preview only. Use Paystack
-**test-mode** credentials (`sk_test_...` and, optionally, `pk_test_...`) only.
-Never expose `PAYSTACK_SECRET_KEY` or `IMEI_HASH_SECRET` in a `NEXT_PUBLIC_`
-variable or client bundle.
+Payments are disabled by default. Set `FEATURE_PAYMENTS=true` only when
+intentionally enabling checkout. Preview and local use Paystack test credentials
+(`sk_test_...`). Production requires `APP_ENV=production`,
+`VERCEL_ENV=production`, and a Paystack live secret (`sk_live_...`); test keys
+are rejected if either environment marker is production, and live keys are
+rejected unless both are production. The application logs only whether Paystack
+test or live mode is active, never the key. Never expose `PAYSTACK_SECRET_KEY`
+or `IMEI_HASH_SECRET` in a `NEXT_PUBLIC_` variable or client bundle.
 
 Set these server-side environment variables for Preview or local development:
 
@@ -66,13 +69,36 @@ server-side transaction verification endpoint (reference, status, ₦500 amount,
 and NGN currency). Pending payments expire after 30 minutes.
 
 PostgreSQL creates the `payments`, payment rate-limit, TAC, and Seller Proof
-tables on first use. For Neon, run the corresponding statements in
-`db/neon-schema.sql` in the Neon SQL Editor before deployment. The email is
+tables on first use and adds missing columns to older versions. For Neon, run
+the idempotent statements in `db/neon-schema.sql` in the Neon SQL Editor before
+deployment. The email is
 stored with its payment only to initialize Paystack's transaction and deliver
 its receipt. An optional device identifier is stored as a keyed hash and its
 last four digits only. The report route and attachment download require a
 successful, confirmed payment; a return from Paystack alone does not unlock
 the report.
+
+### Production launch checklist
+
+- Keep `FEATURE_PAYMENTS` unset or `false` by default. Enable it explicitly
+  only after the production checks below are complete.
+- Confirm the Vercel project is on the Pro plan and that the production
+  deployment has `APP_ENV=production` and `VERCEL_ENV=production`.
+- Add the Paystack live secret as the server-only `PAYSTACK_SECRET_KEY`
+  production environment variable. Do not configure a test key in production;
+  redeploy after changing environment variables.
+- Configure Paystack's live webhook URL as
+  `https://<production-domain>/api/payments/webhook`.
+- Upgrade the production database using the idempotent
+  [`db/neon-schema.sql`](./db/neon-schema.sql), or make a first app request to
+  run the automatic schema upgrade. Confirm that payments, TAC, rate-limit,
+  and Seller Proof tables and columns are present before enabling checkout.
+- Import the licensed TAC data and any attributed supplementary data into the
+  production database using `npm run import:tac` and
+  `npm run import:tac:supplement` from `apps/web`.
+- Verify a controlled live payment and its webhook, then use the aggregate-only
+  `npm run payments:summary` report for reconciliation. The report includes no
+  email addresses or IMEI values.
 
 ## TAC model data
 
@@ -139,6 +165,13 @@ npm test
 npm run test:e2e
 npm run lint
 npm run build
+```
+
+Generate aggregate payment counts by status/day and the successful amount in
+naira with `DATABASE_URL` set:
+
+```bash
+npm run payments:summary
 ```
 
 Playwright starts the Next.js development server and mocks the persistence and

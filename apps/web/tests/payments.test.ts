@@ -438,10 +438,88 @@ describe("payment routes", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("enables payments only when flagged outside production", () => {
-    expect(arePaymentsEnabled("true", "preview", "production")).toBe(true);
-    expect(arePaymentsEnabled("true", "production", "preview")).toBe(false);
-    expect(arePaymentsEnabled("", "preview", "preview")).toBe(false);
+  it.each([
+    {
+      key: "sk_live_checkam_live_key",
+      appEnvironment: "production",
+      vercelEnvironment: "preview",
+    },
+    {
+      key: "sk_live_checkam_live_key",
+      appEnvironment: "preview",
+      vercelEnvironment: "production",
+    },
+    {
+      key: "sk_test_checkam_test_key",
+      appEnvironment: "production",
+      vercelEnvironment: "preview",
+    },
+    {
+      key: "sk_test_checkam_test_key",
+      appEnvironment: "preview",
+      vercelEnvironment: "production",
+    },
+  ])(
+    "refuses unsafe Paystack key mode for $appEnvironment/$vercelEnvironment",
+    async ({ key, appEnvironment, vercelEnvironment }) => {
+      process.env.PAYSTACK_SECRET_KEY = key;
+      process.env.APP_ENV = appEnvironment;
+      process.env.VERCEL_ENV = vercelEnvironment;
+
+      const response = await initializePost(
+        jsonRequest("http://localhost/api/payments/initialize", {
+          email: "buyer@example.com",
+        }),
+      );
+
+      expect(response.status).toBe(503);
+      expect(createPendingPayment).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
+      expect(JSON.stringify(await response.json())).not.toContain(key);
+    },
+  );
+
+  it("allows live Paystack only when both environment markers are production", async () => {
+    const liveSecret = "sk_live_checkam_live_key";
+    process.env.PAYSTACK_SECRET_KEY = liveSecret;
+    process.env.APP_ENV = "production";
+    process.env.VERCEL_ENV = "production";
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    vi.mocked(fetch).mockImplementation(async (_input, init) => {
+      const transaction = JSON.parse(String(init?.body)) as {
+        reference: string;
+      };
+      return Response.json({
+        status: true,
+        data: {
+          reference: transaction.reference,
+          authorization_url: "https://checkout.paystack.com/access-code",
+        },
+      });
+    });
+
+    const response = await initializePost(
+      jsonRequest("http://localhost/api/payments/initialize", {
+        email: "buyer@example.com",
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(fetch).toHaveBeenCalledWith(
+      "https://api.paystack.co/transaction/initialize",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(console.info).toHaveBeenCalledWith("Paystack payment mode: live.");
+    expect(vi.mocked(console.info).mock.calls.flat().join(" ")).not.toContain(
+      liveSecret,
+    );
+  });
+
+  it("keeps payments off by default but allows explicit enablement in production", () => {
+    delete process.env.FEATURE_PAYMENTS;
+    expect(arePaymentsEnabled()).toBe(false);
+    expect(arePaymentsEnabled("true")).toBe(true);
+    expect(arePaymentsEnabled("")).toBe(false);
   });
 });
 

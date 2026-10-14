@@ -8,6 +8,7 @@
     "start": "next start",
     "import:tac": "tsx scripts/import-tac.ts",
     "import:tac:supplement": "tsx scripts/import-tac.ts --supplement",
+    "payments:summary": "tsx scripts/payments-summary.ts",
     "purge:seller-proof": "tsx scripts/purge-seller-proof.ts",
     "lint": "eslint",
     "test": "vitest run",

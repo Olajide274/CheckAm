@@ -31,6 +31,18 @@ CREATE TABLE IF NOT EXISTS analytics_events (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE waitlist_signups
+  ADD COLUMN IF NOT EXISTS email TEXT,
+  ADD COLUMN IF NOT EXISTS phone TEXT,
+  ADD COLUMN IF NOT EXISTS preferred_feature TEXT,
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+ALTER TABLE analytics_events
+  ADD COLUMN IF NOT EXISTS event_name TEXT,
+  ADD COLUMN IF NOT EXISTS properties JSONB DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+
 CREATE TABLE IF NOT EXISTS payments (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   reference UUID NOT NULL UNIQUE,
@@ -50,6 +62,11 @@ CREATE TABLE IF NOT EXISTS payments (
   CHECK ((imei_hash IS NULL) = (imei_luhn_valid IS NULL))
 );
 
+ALTER TABLE payments
+  ADD COLUMN IF NOT EXISTS tac CHAR(8),
+  ADD COLUMN IF NOT EXISTS imei_format_valid BOOLEAN,
+  ADD COLUMN IF NOT EXISTS imei_luhn_valid BOOLEAN;
+
 CREATE TABLE IF NOT EXISTS tac_models (
   tac CHAR(8) PRIMARY KEY,
   brand TEXT,
@@ -57,6 +74,13 @@ CREATE TABLE IF NOT EXISTS tac_models (
   source TEXT,
   imported_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE tac_models
+  ADD COLUMN IF NOT EXISTS tac CHAR(8),
+  ADD COLUMN IF NOT EXISTS brand TEXT,
+  ADD COLUMN IF NOT EXISTS model TEXT,
+  ADD COLUMN IF NOT EXISTS source TEXT,
+  ADD COLUMN IF NOT EXISTS imported_at TIMESTAMPTZ DEFAULT NOW();
 
 CREATE INDEX IF NOT EXISTS payments_status_created_at_idx
   ON payments (status, created_at);
@@ -68,6 +92,12 @@ CREATE TABLE IF NOT EXISTS payment_rate_limits (
   request_count INTEGER NOT NULL CHECK (request_count > 0),
   PRIMARY KEY (scope, client_hash)
 );
+
+ALTER TABLE payment_rate_limits
+  ADD COLUMN IF NOT EXISTS scope TEXT,
+  ADD COLUMN IF NOT EXISTS client_hash TEXT,
+  ADD COLUMN IF NOT EXISTS window_started_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS request_count INTEGER;
 
 CREATE INDEX IF NOT EXISTS payment_rate_limits_window_started_at_idx
   ON payment_rate_limits (window_started_at);
@@ -82,6 +112,15 @@ CREATE TABLE IF NOT EXISTS seller_proof_requests (
   responded_at TIMESTAMPTZ,
   CHECK ((proof_data IS NULL) = (proof_mime IS NULL))
 );
+
+ALTER TABLE seller_proof_requests
+  ADD COLUMN IF NOT EXISTS id UUID,
+  ADD COLUMN IF NOT EXISTS payment_reference UUID,
+  ADD COLUMN IF NOT EXISTS token_hash CHAR(64),
+  ADD COLUMN IF NOT EXISTS proof_mime TEXT,
+  ADD COLUMN IF NOT EXISTS proof_data BYTEA,
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
+  ADD COLUMN IF NOT EXISTS responded_at TIMESTAMPTZ;
 
 ALTER TABLE seller_proof_requests
   DROP COLUMN IF EXISTS seller_phone;
