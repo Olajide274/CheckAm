@@ -31,4 +31,47 @@ describe("seller description comparison", () => {
       }),
     ).toBe("Cannot tell");
   });
+
+  it("compares recognised brands when the TAC has no usable model", () => {
+    const itel = { status: "brand_only" as const, brand: "ITEL" };
+
+    expect(compareSellerDescription("ITEL", itel)).toBe(
+      "Brand matches; model cannot be checked",
+    );
+    expect(compareSellerDescription("itel A-series phone", itel)).toBe(
+      "Brand matches; model cannot be checked",
+    );
+    expect(compareSellerDescription("Samsung phone", itel)).toBe(
+      "Does not match the seller's description",
+    );
+    expect(compareSellerDescription("iPhone 12", itel)).toBe(
+      "Does not match the seller's description",
+    );
+    expect(compareSellerDescription("phone, model unknown", itel)).toBe(
+      "Cannot tell",
+    );
+  });
+
+  it("recognises the configured brand aliases", () => {
+    const samsung = { status: "brand_only" as const, brand: "Samsung" };
+    const xiaomi = { status: "brand_only" as const, brand: "Xiaomi" };
+    const google = { status: "brand_only" as const, brand: "Google" };
+
+    expect(compareSellerDescription("Galaxy phone", samsung)).toBe(
+      "Brand matches; model cannot be checked",
+    );
+    expect(compareSellerDescription("Redmi Note", xiaomi)).toBe(
+      "Brand matches; model cannot be checked",
+    );
+    expect(compareSellerDescription("Poco phone", xiaomi)).toBe(
+      "Brand matches; model cannot be checked",
+    );
+    expect(compareSellerDescription("Pixel phone", google)).toBe(
+      "Brand matches; model cannot be checked",
+    );
+    expect(compareSellerDescription("Techno phone", {
+      status: "brand_only",
+      brand: "Tecno",
+    })).toBe("Brand matches; model cannot be checked");
+  });
 });

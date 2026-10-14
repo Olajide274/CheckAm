@@ -2,6 +2,7 @@ import { findTacModel } from "@/lib/database";
 
 export type ModelLookupResult =
   | { status: "found"; brand: string; model: string }
+  | { status: "brand_only"; brand: string }
   | { status: "not_found"; brand: null; model: null };
 
 export interface ModelLookup {
@@ -15,14 +16,22 @@ export const modelLookup: ModelLookup = {
     }
 
     const row = await findTacModel(tac);
-    if (!row?.brand?.trim() || !row.model?.trim()) {
+    const brand = row?.brand?.trim();
+    const model = row?.model?.trim();
+    if (!brand) {
       return { status: "not_found", brand: null, model: null };
+    }
+
+    const comparable = (value: string) =>
+      value.toLocaleLowerCase("en").replace(/[^\p{L}\p{N}]/gu, "");
+    if (!model || comparable(model) === comparable(brand)) {
+      return { status: "brand_only", brand };
     }
 
     return {
       status: "found",
-      brand: row.brand.trim(),
-      model: row.model.trim(),
+      brand,
+      model,
     };
   },
 };

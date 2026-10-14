@@ -193,6 +193,10 @@ export default function ReportPageContent({
             <p>
               <strong>{model.brand}</strong> {model.model}
             </p>
+          ) : model.status === "brand_only" ? (
+            <p>
+              Brand: {model.brand}. The model is not specified in our data.
+            </p>
           ) : (
             <p>No model match is available for this TAC in our database.</p>
           )}

@@ -103,6 +103,25 @@ describe("report model code check", () => {
     ).toBeTruthy();
   });
 
+  it("shows brand-only TAC data without implying a model match", () => {
+    render(
+      <ReportPageContent
+        model={{ status: "brand_only", brand: "ITEL" }}
+        payment={payment}
+        sellerProof={{
+          requested: false,
+          respondedAt: null,
+          proofId: null,
+          proofMime: null,
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByText("Brand: ITEL. The model is not specified in our data."),
+    ).toBeTruthy();
+  });
+
   it("shows a Seller Proof response timestamp and photo link", () => {
     process.env.FEATURE_SELLER_PROOF = "true";
     render(
