@@ -66,6 +66,11 @@ describe("report model code check", () => {
         "This result is based on information reported by users. It is not proof of ownership, legality or safety.",
       ),
     ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Model data: Osmocom TAC database (CC-BY-SA 3.0) and a supplementary community TAC list. Model codes can be wrong or out of date.",
+      ),
+    ).toBeTruthy();
     fireEvent.change(
       screen.getByRole("textbox", {
         name: "What does the seller say this phone is?",

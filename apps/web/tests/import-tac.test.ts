@@ -20,6 +20,7 @@ const supplementFixture = resolve(
   process.cwd(),
   "tests/fixtures/tac-supplement.csv",
 );
+const osmocomFixture = resolve(process.cwd(), "tests/fixtures/tac.csv");
 const originalDatabaseUrl = process.env.DATABASE_URL;
 
 describe("TAC CSV importer", () => {
@@ -44,23 +45,36 @@ describe("TAC CSV importer", () => {
     vi.restoreAllMocks();
   });
 
-  it("lets supplements replace any TAC row and prevents Osmocom overwrites", async () => {
+  it("keeps Osmocom authoritative while letting Osmocom replace supplements", async () => {
     await importTacCsv(supplementFixture, "supplement");
 
-    const upsert = db.query.mock.calls.find(([query]) =>
+    const supplementInsert = db.query.mock.calls.find(([query]) =>
       String(query).includes("INSERT INTO tac_models"),
     );
-    expect(upsert).toBeDefined();
-    expect(String(upsert?.[0])).toContain("ON CONFLICT (tac) DO UPDATE");
-    expect(String(upsert?.[0])).toContain(
-      "WHERE COALESCE(tac_models.source, '') NOT LIKE 'supplement:%'",
+    expect(supplementInsert).toBeDefined();
+    expect(String(supplementInsert?.[0])).toContain(
+      "ON CONFLICT (tac) DO NOTHING",
     );
-    expect(String(upsert?.[0])).toContain(
-      "OR EXCLUDED.source LIKE 'supplement:%'",
-    );
-    expect(upsert?.[1]).toContain("supplement:Local test source");
+    expect(String(supplementInsert?.[0])).not.toContain("DO UPDATE");
+    expect(supplementInsert?.[1]).toContain("supplement:Local test source");
     expect(vi.mocked(console.info)).toHaveBeenCalledWith(
-      "TAC import complete (supplement): upserted 2, skipped invalid 2, duplicates 1, rows 5.",
+      "TAC import complete (supplement): inserted 1, skipped invalid 2, duplicates 1, rows 5.",
     );
+
+    const callsBeforeOsmocom = db.query.mock.calls.length;
+    await importTacCsv(osmocomFixture, "osmocom");
+    const osmocomInsert = db.query.mock.calls
+      .slice(callsBeforeOsmocom)
+      .find(([query]) => String(query).includes("INSERT INTO tac_models"));
+    expect(osmocomInsert).toBeDefined();
+    expect(String(osmocomInsert?.[0])).toContain(
+      "ON CONFLICT (tac) DO UPDATE",
+    );
+    expect(String(osmocomInsert?.[0])).toContain(
+      "source = EXCLUDED.source",
+    );
+    expect(
+      (osmocomInsert?.[1] as string[]).filter((_, index) => index % 4 === 3),
+    ).toEqual(["Osmocom TAC database", "Osmocom TAC database"]);
   });
 });

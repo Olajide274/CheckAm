@@ -196,10 +196,7 @@ export default function ReportPageContent({
           ) : (
             <p>No model match is available for this TAC in our database.</p>
           )}
-          <p>
-            Model codes can be wrong or out of date. This does not confirm the
-            device&apos;s origin.
-          </p>
+          <p>This does not confirm the device&apos;s origin.</p>
           <label className="report-model-label">
             What does the seller say this phone is?
             <input
@@ -370,6 +367,10 @@ export default function ReportPageContent({
             )}
           </section>
         )}
+        <footer className="report-footer">
+          Model data: Osmocom TAC database (CC-BY-SA 3.0) and a supplementary
+          community TAC list. Model codes can be wrong or out of date.
+        </footer>
       </div>
     </main>
   );

@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Pool } from "pg";
+import { importTacModelBatch } from "../lib/database";
 import {
   parseTacCsv,
   parseTacSupplementCsv,
@@ -46,30 +47,14 @@ export async function importTacCsv(
         )
       `);
 
+      let writtenRows = 0;
       for (let offset = 0; offset < rows.length; offset += batchSize) {
         const batch = rows.slice(offset, offset + batchSize);
-        const values: Array<string> = [];
-        const placeholders = batch.map((row, index) => {
-          const start = index * 4;
-          values.push(row.tac, row.brand, row.model, row.source);
-          return `($${start + 1}, $${start + 2}, $${start + 3}, $${start + 4})`;
-        });
-        await client.query(
-          `INSERT INTO tac_models (tac, brand, model, source)
-           VALUES ${placeholders.join(", ")}
-           ON CONFLICT (tac) DO UPDATE
-           SET brand = EXCLUDED.brand,
-               model = EXCLUDED.model,
-               source = EXCLUDED.source,
-               imported_at = NOW()
-           WHERE COALESCE(tac_models.source, '') NOT LIKE 'supplement:%'
-              OR EXCLUDED.source LIKE 'supplement:%'`,
-          values,
-        );
+        writtenRows += await importTacModelBatch(client, batch, format);
       }
       await client.query("COMMIT");
       console.info(
-        `TAC import complete (${format}): upserted ${rows.length}, skipped invalid ${parsed.invalidRows}, duplicates ${parsed.duplicateRows}, rows ${parsed.totalRows}.`,
+        `TAC import complete (${format}): ${format === "supplement" ? "inserted" : "upserted"} ${writtenRows}, skipped invalid ${parsed.invalidRows}, duplicates ${parsed.duplicateRows}, rows ${parsed.totalRows}.`,
       );
     } catch (error) {
       await client.query("ROLLBACK");

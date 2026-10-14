@@ -139,6 +139,44 @@ async function ensureSchema(): Promise<void> {
   await globalThis.checkAmSchemaReady;
 }
 
+export interface TacModelImportRow {
+  tac: string;
+  brand: string;
+  model: string;
+  source: string;
+}
+
+export async function importTacModelBatch(
+  client: PoolClient,
+  rows: readonly TacModelImportRow[],
+  format: "osmocom" | "supplement",
+): Promise<number> {
+  const values: string[] = [];
+  const placeholders = rows.map((row, index) => {
+    const start = index * 4;
+    values.push(row.tac, row.brand, row.model, row.source);
+    return `($${start + 1}, $${start + 2}, $${start + 3}, $${start + 4})`;
+  });
+  const conflictHandling =
+    format === "supplement"
+      ? "ON CONFLICT (tac) DO NOTHING"
+      : `ON CONFLICT (tac) DO UPDATE
+         SET brand = EXCLUDED.brand,
+             model = EXCLUDED.model,
+             source = EXCLUDED.source,
+             imported_at = NOW()`;
+  const result = await client.query(
+    `INSERT INTO tac_models (tac, brand, model, source)
+     VALUES ${placeholders.join(", ")}
+     ${conflictHandling}`,
+    values,
+  );
+  if (result.rowCount === null) {
+    throw new Error("TAC import did not report the number of rows written.");
+  }
+  return result.rowCount;
+}
+
 export async function recordAnalyticsEvent(
   event: "page_view" | "imei_check_attempted" | "full_report_click",
 ): Promise<void> {

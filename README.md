@@ -50,9 +50,11 @@ example, a server cron can run:
 
 To load an Osmocom TAC CSV with `tac`, `brand`, and `model` columns, place it at
 `apps/web/data/tac.csv` and run `npm run import:tac` from `apps/web` with
-`DATABASE_URL` set. The data directory is ignored by Git. Imports skip invalid
-rows, let the last valid duplicate TAC take precedence, and update existing TAC
-records.
+`DATABASE_URL` set. The supplementary community TAC list uses
+`apps/web/data/tac-supplement.csv` and `npm run import:tac:supplement`. The data
+directory is ignored by Git. Imports skip invalid rows and let the last valid
+duplicate TAC take precedence. Osmocom TAC data (CC-BY-SA 3.0) is authoritative
+and overwrites existing TAC records; the supplement only inserts missing TACs.
 
 ## Local development
 

@@ -81,10 +81,11 @@ report. The Osmocom importer expects its license line followed by
 `tac,name,name,...`; the first `name` is mapped to brand and the second to
 model. The supplement importer expects `tac,brand,model` and optionally a
 `source` column. Both validate eight-digit TACs and non-empty brand/model
-values, skip invalid rows, report row counts, and upsert by TAC. Duplicate TACs
-inside one file use the last valid row. A supplement row takes precedence over
-an Osmocom row regardless of import order; a later supplement import replaces
-an earlier supplement row.
+values, skip invalid rows, and report row counts. Duplicate TACs inside one
+file use the last valid row. Osmocom is authoritative: its import overwrites
+any existing TAC row, while a supplement import inserts only TACs not already
+present. The row's `source` records either the Osmocom TAC database or the
+supplement attribution.
 
 Set `DATABASE_URL` to the same PostgreSQL connection string used by the
 application, then run from `apps/web`. Replace the placeholder with the
@@ -102,11 +103,11 @@ The file arguments are optional. The first command defaults to
 `apps/web/data/` are excluded from Git; keep source datasets out of commits and
 record each supplemental dataset's attribution in its `source` column.
 
-The Osmocom-style data is open reference data attributed to the Osmocom TAC
-database under CC-BY-SA 3.0. This is not the complete GSMA TAC database, and
-neither the reference data nor the supplement is guaranteed to include every
-model sold in Nigeria. A missing match means only that this database has no
-usable model entry for the submitted TAC.
+Model data comes from the Osmocom TAC database under CC-BY-SA 3.0 and a
+supplementary community TAC list. The Osmocom data is not the complete GSMA TAC
+database, and neither source is guaranteed to include every model sold in
+Nigeria. A missing match means only that this database has no usable model
+entry for the submitted TAC.
 
 ## Seller Proof
 
