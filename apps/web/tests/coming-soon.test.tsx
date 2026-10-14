@@ -1,22 +1,43 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import AppPage from "@/app/app/page";
 import LoginPage from "@/app/login/page";
 
-describe("unfinished public routes", () => {
+const { redirect, router } = vi.hoisted(() => ({
+  redirect: vi.fn(),
+  router: {
+    replace: vi.fn(),
+    refresh: vi.fn(),
+  },
+}));
+
+vi.mock("next/navigation", () => ({
+  redirect,
+  useRouter: () => router,
+}));
+
+vi.mock("@/components/account-header", () => ({
+  AccountHeader: () => null,
+}));
+
+describe("account routes", () => {
   afterEach(cleanup);
 
-  it.each([
-    ["/login", LoginPage],
-    ["/app", AppPage],
-  ])("%s displays a coming soon page with a home link", (_path, Page) => {
-    render(<Page />);
+  it("renders the real sign-in page at /login", () => {
+    render(<LoginPage />);
 
-    expect(screen.getByRole("heading", { name: "Coming soon" })).toBeDefined();
+    expect(screen.getByRole("heading", { name: "Sign in" })).toBeDefined();
+    expect(screen.getByLabelText("Email")).toBeDefined();
+    expect(screen.getByLabelText("Password")).toBeDefined();
     expect(
-      screen.getByRole("link", { name: "Back to CheckAm home" }).getAttribute("href"),
-    ).toBe("/");
-    expect(screen.queryByLabelText("Nigerian phone number")).toBeNull();
-    expect(screen.queryByRole("navigation", { name: "Main navigation" })).toBeNull();
+      screen.getByRole("link", { name: "Create an account" }).getAttribute("href"),
+    ).toBe("/register");
+    expect(screen.queryByRole("heading", { name: "Coming soon" })).toBeNull();
+  });
+
+  it("redirects /app to /dashboard", () => {
+    AppPage();
+
+    expect(redirect).toHaveBeenCalledWith("/dashboard");
   });
 });

@@ -1,6 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import BillOfSalePage from "@/app/bill-of-sale/page";
 
+const database = vi.hoisted(() => ({
+  getAccountBySessionToken: vi.fn(),
+  consumeAccountUsage: vi.fn(),
+}));
+
+vi.mock("@/lib/database", () => database);
+
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ get: () => undefined }),
+}));
+
 vi.mock("next/navigation", () => ({
   notFound: () => {
     throw new Error("NEXT_NOT_FOUND");
@@ -18,15 +29,15 @@ afterEach(() => {
 });
 
 describe("bill of sale route", () => {
-  it("returns not found when the feature flag is unset", () => {
+  it("returns not found when the feature flag is unset", async () => {
     delete process.env.FEATURE_BILL_OF_SALE;
 
-    expect(() => BillOfSalePage()).toThrow("NEXT_NOT_FOUND");
+    await expect(BillOfSalePage()).rejects.toThrow("NEXT_NOT_FOUND");
   });
 
-  it("renders only when the feature flag is enabled", () => {
+  it("renders only when the feature flag is enabled", async () => {
     process.env.FEATURE_BILL_OF_SALE = "true";
 
-    expect(BillOfSalePage()).toBeDefined();
+    await expect(BillOfSalePage()).resolves.toBeDefined();
   });
 });

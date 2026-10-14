@@ -8,19 +8,32 @@ ASP.NET Core API foundation.
 ## Current roadmap status
 
 - Steps 0 and 2: DONE.
-- Step 1: CURRENT — deploy the landing page and demand test.
+- Phase 1: CURRENT — accounts, roles, free-tier limits, and dashboards.
+- Step 1: TODO — deploy the landing page and demand test.
 - Steps 1b and 1c: DONE.
 - Step 1d: DONE — add TAC model lookup to the paid report.
 - Step 3: BLOCKED — the phone OTP flow exists, but a production SMS sender is
   deferred until a provider is chosen.
-- Steps 4–11: TODO.
+- Steps 4–11: TODO, including Step 7 (paid report and Seller Proof).
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) and
 [the SMS provider decision](docs/decisions/0001-defer-sms-provider.md).
 The IMEI check validates input format only; it does not check a device registry.
-The ₦500 button records interest and does not take payment.
-The public `/login` and `/app` routes show a Coming soon page. The OTP
-implementation remains in the repository but is not exposed on the public site.
+Email/password accounts are available at `/register` and `/login`; phone is
+optional, stored for later verification, and not verified. Sessions use opaque
+random tokens in `HttpOnly`, `SameSite=Lax` cookies, with only the token hash
+stored in PostgreSQL, and expire after 30 days. Email verification is a
+non-blocking reminder; in development, its token is written to the server log
+and can be submitted at `/api/accounts/verify-email`. No email or SMS provider
+is connected.
+`/dashboard` shows buyer- or seller-specific links. Free buyers may start one
+full-report checkout per rolling 30 days; pending checkouts reserve the limit
+until they expire after 30 minutes. Anonymous visitors keep the existing
+optional paid-report flow and are not subject to the registered-account limit.
+Free sellers may use the bill-of-sale generator twice per rolling 30 days while
+signed in; anonymous use remains as before. Premium and Pro plan values are
+reserved in the data model; subscription billing is not available. The seller
+shop route is only a coming-soon stub.
 The server-gated `/report/[reference]` route is enabled only with
 `FEATURE_PAYMENTS=true` and only after a successful payment reference is
 confirmed server-side. It keeps the report behind a redirect to `/` for any
@@ -29,6 +42,11 @@ The report's model code check looks up the first eight IMEI digits (TAC) in the
 local `tac_models` table. Payment records store the TAC, not the full IMEI.
 Seller descriptions are compared using normalized word tokens; partial overlap
 is reported as inconclusive.
+
+To register, configure `DATABASE_URL`, run `npm run dev` from `apps/web`, and
+open `/register`. Use a valid email, a password of at least 12 characters, and
+choose buyer or seller. Account tables and indexes are created on first
+database use.
 
 ## Seller Proof attachments
 
@@ -92,10 +110,10 @@ Development and does not send a message.
    database's PostgreSQL connection URI. Use the provider's serverless/pooling
    connection URI where it supplies one; the database role must be able to
    create and write the app's tables.
-4. Deploy. The web app creates its `waitlist_signups` and `analytics_events`
-   tables on the first waitlist or analytics request; no API EF migration is
-   needed for these web tables. Verify the landing page, submit a test signup,
-   and confirm the analytics and signup records in the database.
+4. Deploy. The web app creates its waitlist, analytics, account, payment, TAC,
+   and Seller Proof tables on first database use; no API EF migration is needed
+   for these web tables. Verify the landing page, create a test account, and
+   confirm the expected records in the database.
 
 ### Production payments launch checklist
 

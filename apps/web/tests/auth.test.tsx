@@ -2,7 +2,22 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { POST as authProxyPost } from "@/app/api/auth/[...segments]/route";
+import { POST as registerPost } from "@/app/api/accounts/register/route";
+import { POST as loginPost } from "@/app/api/accounts/login/route";
 import { LoginForm } from "@/components/login-form";
+import { hashPassword } from "@/lib/accounts";
+import PricingPage from "@/app/pricing/page";
+
+const database = vi.hoisted(() => ({
+  consumeAccountRateLimit: vi.fn(),
+  createAccount: vi.fn(),
+  createAccountSession: vi.fn(),
+  createEmailVerificationToken: vi.fn(),
+  getAccountByEmail: vi.fn(),
+  getAccountBySessionToken: vi.fn(),
+  deleteAccountSession: vi.fn(),
+  verifyAccountEmail: vi.fn(),
+}));
 
 const { router } = vi.hoisted(() => ({
   router: {
@@ -11,14 +26,48 @@ const { router } = vi.hoisted(() => ({
   },
 }));
 
+vi.mock("@/lib/database", () => database);
+
 vi.mock("next/navigation", () => ({
   useRouter: () => router,
 }));
 
-describe("phone login", () => {
+vi.mock("@/components/account-header", () => ({
+  AccountHeader: () => null,
+}));
+
+const account = {
+  id: "d9b81d00-b859-4df5-8374-5df9f6a354c6",
+  email: "buyer@example.com",
+  phone: null,
+  role: "buyer" as const,
+  plan: "free" as const,
+  emailVerified: false,
+  createdAt: new Date("2026-10-14T00:00:00Z"),
+};
+
+function jsonRequest(path: string, body: unknown): Request {
+  return new Request(`http://localhost${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+describe("email-first accounts", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     router.replace.mockReset();
     router.refresh.mockReset();
+    database.consumeAccountRateLimit.mockResolvedValue(true);
+    database.createAccount.mockImplementation(async (input) => ({
+      ...account,
+      email: input.email,
+      phone: input.phone,
+      role: input.role,
+    }));
+    database.createAccountSession.mockResolvedValue(undefined);
+    database.createEmailVerificationToken.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -26,72 +75,150 @@ describe("phone login", () => {
     vi.unstubAllGlobals();
   });
 
-  it("requests and verifies an OTP before navigating to the app route", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ message: "sent" }), { status: 202 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ authenticated: true }), { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-    render(<LoginForm />);
+  it("registers a normalized email, required role, optional phone, and scrypt password", async () => {
+    const response = await registerPost(
+      jsonRequest("/api/accounts/register", {
+        email: " Buyer@Example.com ",
+        password: "a-long-password-with-12+",
+        phone: "+234 801 234 5678",
+        role: "buyer",
+      }),
+    );
+    const result = (await response.json()) as {
+      account: { email: string; role: string; plan: string; emailVerified: boolean };
+    };
+    const createInput = database.createAccount.mock.calls[0]?.[0] as {
+      email: string;
+      passwordHash: string;
+      phone: string;
+      role: string;
+    };
 
-    fireEvent.change(screen.getByLabelText("Nigerian phone number"), {
-      target: { value: "08012345678" },
+    expect(response.status).toBe(201);
+    expect(result.account).toEqual({
+      id: account.id,
+      email: "buyer@example.com",
+      phone: "+234 801 234 5678",
+      role: "buyer",
+      plan: "free",
+      emailVerified: false,
     });
-    fireEvent.click(screen.getByRole("button", { name: "Send a sign-in code" }));
+    expect(createInput.email).toBe("buyer@example.com");
+    expect(createInput.role).toBe("buyer");
+    expect(createInput.passwordHash).not.toBe("a-long-password-with-12+");
+    expect(createInput.passwordHash).toMatch(/^scrypt\$16384\$8\$1\$/);
+    expect(database.createAccountSession).toHaveBeenCalledWith(
+      expect.objectContaining({ accountId: account.id }),
+    );
+    expect(response.headers.get("set-cookie")).toContain("HttpOnly");
+    expect(response.headers.get("set-cookie")).toContain("SameSite=Lax");
+    expect(JSON.stringify(result)).not.toContain("password");
+  });
 
-    await screen.findByLabelText("Sign-in code");
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      1,
-      "/api/auth/otp/request",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({ phoneNumber: "08012345678" }),
+  it("rejects an invalid email, missing role, and short password", async () => {
+    for (const body of [
+      { email: "not-an-email", password: "a-long-password-with-12+", role: "buyer" },
+      { email: "buyer@example.com", password: "a-long-password-with-12+" },
+      { email: "buyer@example.com", password: "short", role: "seller" },
+    ]) {
+      const response = await registerPost(
+        jsonRequest("/api/accounts/register", body),
+      );
+      expect(response.status).toBe(400);
+    }
+    expect(database.createAccount).not.toHaveBeenCalled();
+  });
+
+  it("logs in with the stored password hash and gives a new session cookie", async () => {
+    const password = "correct-horse-battery-staple";
+    database.getAccountByEmail.mockResolvedValue({
+      ...account,
+      passwordHash: await hashPassword(password),
+    });
+
+    const response = await loginPost(
+      jsonRequest("/api/accounts/login", {
+        email: "BUYER@example.com",
+        password,
       }),
     );
 
-    fireEvent.change(screen.getByLabelText("Sign-in code"), {
-      target: { value: "123456" },
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      account: { email: "buyer@example.com", role: "buyer", plan: "free" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(database.getAccountByEmail).toHaveBeenCalledWith("buyer@example.com");
+    expect(response.headers.get("set-cookie")).toContain("HttpOnly");
+  });
 
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/app"));
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      "/api/auth/otp/verify",
+  it("rate limits registration before storing an account", async () => {
+    database.consumeAccountRateLimit.mockResolvedValue(false);
+
+    const response = await registerPost(
+      jsonRequest("/api/accounts/register", {
+        email: "buyer@example.com",
+        password: "a-long-password-with-12+",
+        role: "seller",
+      }),
+    );
+
+    expect(response.status).toBe(429);
+    expect(database.createAccount).not.toHaveBeenCalled();
+  });
+
+  it("posts registration details from the form and navigates to the dashboard", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ account }), { status: 201 }),
+      ),
+    );
+    render(<LoginForm mode="register" />);
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "seller@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "a-long-password-with-12+" },
+    });
+    fireEvent.change(screen.getByLabelText("I am joining as a"), {
+      target: { value: "seller" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/dashboard"));
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/accounts/register",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ phoneNumber: "08012345678", code: "123456" }),
+        body: JSON.stringify({
+          email: "seller@example.com",
+          password: "a-long-password-with-12+",
+          phone: "",
+          role: "seller",
+        }),
       }),
     );
   });
 
-  it("shows ProblemDetails returned by the API", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            title: "Too many code requests",
-            detail: "Wait a little before requesting another code.",
-          }),
-          { status: 429 },
-        ),
-      ),
+  it("renders separate buyer and seller pricing with premium billing unavailable", () => {
+    render(<PricingPage />);
+
+    expect(screen.getByRole("heading", { name: "For buyers" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "For sellers" })).toBeTruthy();
+    expect(screen.getAllByText("Premium").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Pro").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Coming soon").length).toBeGreaterThan(0);
+    const pricingText = document.body.textContent ?? "";
+    expect(pricingText).toContain(
+      "Up to 1 full report unlock per rolling 30 days",
     );
-    render(<LoginForm />);
-
-    fireEvent.change(screen.getByLabelText("Nigerian phone number"), {
-      target: { value: "08012345678" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Send a sign-in code" }));
-
-    expect((await screen.findByRole("alert")).textContent).toContain(
-      "Wait a little before requesting another code.",
+    expect(pricingText).toContain(
+      "Up to 2 bill of sale actions per rolling 30 days",
     );
   });
 });
 
-describe("auth API proxy", () => {
+describe("legacy phone auth proxy", () => {
   const originalApiUrl = process.env.CHECKAM_API_URL;
 
   beforeEach(() => {
@@ -107,7 +234,7 @@ describe("auth API proxy", () => {
     vi.unstubAllGlobals();
   });
 
-  it("forwards requests and the API session cookie", async () => {
+  it("continues to forward the existing API session cookie", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ authenticated: true }), {
         status: 200,
@@ -118,43 +245,23 @@ describe("auth API proxy", () => {
       }),
     );
     vi.stubGlobal("fetch", fetchMock);
-    const request = new NextRequest("http://localhost/api/auth/otp/request", {
-      method: "POST",
-      headers: {
-        Cookie: "checkam_session=existing-token",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ phoneNumber: "08012345678" }),
+    const request = new NextRequest("http://localhost/api/auth/session", {
+      headers: { Cookie: "checkam_session=existing-token" },
     });
 
     const response = await authProxyPost(request, {
-      params: Promise.resolve({ segments: ["otp", "request"] }),
+      params: Promise.resolve({ segments: ["session"] }),
     });
 
     expect(response.status).toBe(200);
     expect(response.headers.get("set-cookie")).toContain("HttpOnly");
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:5000/auth/otp/request",
+      "http://localhost:5000/auth/session",
       expect.objectContaining({
-        method: "POST",
         headers: expect.objectContaining({
           Cookie: "checkam_session=existing-token",
         }),
-        body: JSON.stringify({ phoneNumber: "08012345678" }),
       }),
     );
-  });
-
-  it("returns ProblemDetails if no API URL is configured", async () => {
-    delete process.env.CHECKAM_API_URL;
-    const request = new NextRequest("http://localhost/api/auth/session");
-
-    const response = await authProxyPost(request, {
-      params: Promise.resolve({ segments: ["session"] }),
-    });
-    const body = await response.json();
-
-    expect(response.status).toBe(503);
-    expect(body.title).toBe("Authentication unavailable");
   });
 });

@@ -36,14 +36,17 @@ Done when: the public check endpoint and page return only the allowed statuses; 
 ## Step 6: Admin, proof, and disputes (TODO)
 Done when: admin review queue; "Under review" state; dispute workflow with an audit log.
 
-## Step 7: Paid report and Seller Proof (CURRENT)
+## Step 7: Paid report and Seller Proof (TODO)
 Done when: the free IMEI result states that format/Luhn checks do not identify the model or indicate user reports and links to the ₦500 report; successful payment unlocks the TAC brand/model result, the Bill of Sale generator, and Seller Proof controls; low-quality TAC rows with an empty model or a model equal to its brand are presented as brand-only, with recognised brand aliases used to avoid overstating seller-description matches; a paid buyer can create, copy, and share a unique Seller Proof request link; the seller can submit one receipt/device photo without collecting a phone number; the payment-gated report shows the response time and submitted photo only for the successful payment the proof belongs to; uploads are decoded, rotated, stripped of metadata, resized to at most 1600 pixels, and re-encoded as JPEG at quality 80 with a 2 MB cap; attachment data and MIME types are deleted 30 days after response; every result includes the required disclaimer; and authorization, upload-validation, retention, feature-flag, payment-gating, TAC honesty, and UI tests pass.
 
 Authorized launch-readiness work within Step 7: make first-use schema upgrades idempotent for older databases, enforce Paystack key-mode safety while keeping payments off by default in production, add aggregate-only payment summaries, and document production launch checks. This authorization does not change any roadmap step status.
 
 Step 1e hardening (DONE): Seller Proof authorization, phone-number removal, image processing, 30-day retention, tests, and README guidance are included in this step.
 
-## Step 8: Payments (TODO)
+## Phase 1: Accounts, roles, and free-tier limits (DONE)
+Done when: users can register and log in with validated email and password, optional unverified phone, and required buyer/seller role; passwords are securely hashed and sessions use a documented httpOnly-cookie approach; development-only email-verification stubbing is non-blocking; role-based dashboard and pricing pages describe free, premium, and pro plans; server-side free-tier entitlements are enforced for anonymous or registered full-report purchases as documented; premium/pro billing remains unavailable; account endpoints are rate-limited; and account, role, free-limit, pricing, auth, and UI tests pass. No external messaging providers, device registry, shop pilot beyond a stub link, WhatsApp integration, government APIs, or subscription billing.
+
+## Step 8: Payments (CURRENT)
 Done when: 3 free checks per verified number; wallet and bundles through Paystack or Flutterwave; webhooks are idempotent; reconciliation report.
 
 ## Step 9: WhatsApp check (TODO)

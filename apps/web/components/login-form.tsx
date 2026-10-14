@@ -3,16 +3,20 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
-type ProblemDetails = {
-  title?: string;
-  detail?: string;
+type Props = {
+  mode: "login" | "register";
 };
 
-export function LoginForm() {
+type ProblemDetails = {
+  error?: string;
+};
+
+export function LoginForm({ mode }: Props) {
   const router = useRouter();
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [code, setCode] = useState("");
-  const [codeRequested, setCodeRequested] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
+  const [role, setRole] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -22,29 +26,24 @@ export function LoginForm() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(
-        codeRequested ? "/api/auth/otp/verify" : "/api/auth/otp/request",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            codeRequested ? { phoneNumber, code } : { phoneNumber },
-          ),
-        },
-      );
+      const response = await fetch(`/api/accounts/${mode}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password,
+          ...(mode === "register" ? { phone, role } : {}),
+        }),
+      });
 
       if (!response.ok) {
         const problem = (await response.json()) as ProblemDetails;
-        setError(problem.detail ?? problem.title ?? "Unable to sign in.");
+        setError(problem.error ?? "Unable to continue.");
         return;
       }
 
-      if (codeRequested) {
-        router.replace("/app");
-        router.refresh();
-      } else {
-        setCodeRequested(true);
-      }
+      router.replace("/dashboard");
+      router.refresh();
     } catch {
       setError("Unable to reach CheckAm. Check your connection and try again.");
     } finally {
@@ -54,35 +53,59 @@ export function LoginForm() {
 
   return (
     <form className="login-form" onSubmit={submit}>
-      <label htmlFor="phone-number">Nigerian phone number</label>
+      <label htmlFor={`${mode}-email`}>Email</label>
       <input
-        autoComplete="tel"
+        autoComplete="email"
         autoFocus
-        id="phone-number"
-        inputMode="tel"
-        onChange={(event) => setPhoneNumber(event.target.value)}
-        placeholder="+234 801 234 5678"
+        id={`${mode}-email`}
+        maxLength={254}
+        onChange={(event) => setEmail(event.target.value)}
         required
-        type="tel"
-        value={phoneNumber}
+        type="email"
+        value={email}
       />
 
-      {codeRequested && (
+      <label htmlFor={`${mode}-password`}>Password</label>
+      <input
+        autoComplete={mode === "register" ? "new-password" : "current-password"}
+        id={`${mode}-password`}
+        maxLength={128}
+        minLength={12}
+        onChange={(event) => setPassword(event.target.value)}
+        required
+        type="password"
+        value={password}
+      />
+      {mode === "register" && (
         <>
           <p className="login-hint">
-            Enter the six-digit code sent to your phone.
+            Use at least 12 characters. We never log your password.
           </p>
-          <label htmlFor="otp-code">Sign-in code</label>
-          <input
-            autoComplete="one-time-code"
-            id="otp-code"
-            inputMode="numeric"
-            maxLength={6}
-            onChange={(event) => setCode(event.target.value)}
-            pattern="[0-9]{6}"
+          <label htmlFor="account-role">I am joining as a</label>
+          <select
+            id="account-role"
+            onChange={(event) => setRole(event.target.value)}
             required
-            value={code}
+            value={role}
+          >
+            <option value="">Choose a role</option>
+            <option value="buyer">Buyer</option>
+            <option value="seller">Seller</option>
+          </select>
+          <label htmlFor="account-phone">Phone number (optional)</label>
+          <input
+            autoComplete="tel"
+            id="account-phone"
+            maxLength={32}
+            onChange={(event) => setPhone(event.target.value)}
+            placeholder="+234 801 234 5678"
+            type="tel"
+            value={phone}
           />
+          <p className="login-hint">
+            Your phone number is stored for possible later verification. No SMS
+            is sent in this phase.
+          </p>
         </>
       )}
 
@@ -91,24 +114,10 @@ export function LoginForm() {
       <button className="login-submit" disabled={isSubmitting} type="submit">
         {isSubmitting
           ? "Please wait…"
-          : codeRequested
-            ? "Sign in"
-            : "Send a sign-in code"}
+          : mode === "register"
+            ? "Create account"
+            : "Sign in"}
       </button>
-
-      {codeRequested && (
-        <button
-          className="login-resend"
-          disabled={isSubmitting}
-          onClick={() => {
-            setCodeRequested(false);
-            setCode("");
-          }}
-          type="button"
-        >
-          Use a different number
-        </button>
-      )}
     </form>
   );
 }

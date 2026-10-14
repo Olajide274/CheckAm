@@ -167,6 +167,8 @@ export async function initializePayment(input: {
   email: string;
   imei?: string;
   callbackUrl: string;
+  accountId?: string;
+  freeReportLimit?: number;
 }): Promise<{ authorizationUrl: string; reference: string }> {
   const secret = getPaystackSecretKey();
   const email = input.email.trim().toLowerCase();
@@ -177,15 +179,29 @@ export async function initializePayment(input: {
   const imei = input.imei ? getImeiHash(input.imei) : null;
   const reference = randomUUID();
 
-  await createPendingPayment({
+  const pendingPaymentCreated = await createPendingPayment({
     reference,
     email,
+    ...(input.accountId
+      ? {
+          accountId: input.accountId,
+          ...(input.freeReportLimit !== undefined
+            ? { freeReportLimit: input.freeReportLimit }
+            : {}),
+        }
+      : {}),
     imeiHash: imei?.hash ?? null,
     tac: imei?.tac ?? null,
     imeiLast4: imei?.last4 ?? null,
     imeiFormatValid: imei?.formatValid ?? null,
     imeiLuhnValid: imei?.luhnValid ?? null,
   });
+  if (pendingPaymentCreated === false) {
+    throw new PaymentFlowError(
+      "The free full-report limit is used for this 30-day period.",
+      429,
+    );
+  }
 
   let response: Response;
   try {

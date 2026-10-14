@@ -43,12 +43,56 @@ ALTER TABLE analytics_events
   ADD COLUMN IF NOT EXISTS properties JSONB DEFAULT '{}'::jsonb,
   ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 
+CREATE TABLE IF NOT EXISTS user_accounts (
+  id UUID PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  phone TEXT,
+  role TEXT NOT NULL CHECK (role IN ('buyer', 'seller')),
+  plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'premium', 'pro')),
+  email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS account_sessions (
+  token_hash CHAR(64) PRIMARY KEY,
+  account_id UUID NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS account_email_verification_tokens (
+  token_hash CHAR(64) PRIMARY KEY,
+  account_id UUID NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS account_rate_limits (
+  scope TEXT NOT NULL,
+  identifier_hash CHAR(64) NOT NULL,
+  window_started_at TIMESTAMPTZ NOT NULL,
+  request_count INTEGER NOT NULL CHECK (request_count > 0),
+  PRIMARY KEY (scope, identifier_hash)
+);
+
+CREATE TABLE IF NOT EXISTS account_usage (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  account_id UUID NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  action TEXT NOT NULL CHECK (action IN ('bill_of_sale')),
+  used_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS account_usage_account_action_used_idx
+  ON account_usage (account_id, action, used_at);
+
 CREATE TABLE IF NOT EXISTS payments (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   reference UUID NOT NULL UNIQUE,
   amount INTEGER NOT NULL CHECK (amount = 50000),
   status TEXT NOT NULL CHECK (status IN ('pending', 'success', 'failed')),
   email TEXT NOT NULL,
+  account_id UUID REFERENCES user_accounts(id) ON DELETE SET NULL,
   imei_hash TEXT,
   tac CHAR(8),
   imei_last4 CHAR(4),
@@ -63,6 +107,7 @@ CREATE TABLE IF NOT EXISTS payments (
 );
 
 ALTER TABLE payments
+  ADD COLUMN IF NOT EXISTS account_id UUID REFERENCES user_accounts(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS tac CHAR(8),
   ADD COLUMN IF NOT EXISTS imei_format_valid BOOLEAN,
   ADD COLUMN IF NOT EXISTS imei_luhn_valid BOOLEAN;

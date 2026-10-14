@@ -7,6 +7,7 @@ import {
   consumePaymentRateLimit,
   createPendingPayment,
   getPaymentByReference,
+  getAccountBySessionToken,
   markPaymentFailed,
   markPaymentSuccessful,
 } from "@/lib/database";
@@ -16,6 +17,7 @@ vi.mock("@/lib/database", () => ({
   consumePaymentRateLimit: vi.fn(),
   createPendingPayment: vi.fn(),
   getPaymentByReference: vi.fn(),
+  getAccountBySessionToken: vi.fn(),
   markPaymentFailed: vi.fn(),
   markPaymentSuccessful: vi.fn(),
 }));
@@ -66,7 +68,8 @@ describe("payment routes", () => {
     process.env.PAYSTACK_SECRET_KEY = secret;
     process.env.APP_BASE_URL = "http://localhost:3000";
     vi.mocked(consumePaymentRateLimit).mockResolvedValue(true);
-    vi.mocked(createPendingPayment).mockResolvedValue();
+    vi.mocked(getAccountBySessionToken).mockResolvedValue(null);
+    vi.mocked(createPendingPayment).mockResolvedValue(true);
     vi.mocked(getPaymentByReference).mockResolvedValue({
       reference,
       amount: 50_000,
@@ -435,6 +438,41 @@ describe("payment routes", () => {
 
     expect(response.status).toBe(429);
     expect(createPendingPayment).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("enforces the free buyer report limit on the server during checkout initialization", async () => {
+    vi.mocked(getAccountBySessionToken).mockResolvedValue({
+      id: "d9b81d00-b859-4df5-8374-5df9f6a354c6",
+      email: "buyer@example.com",
+      phone: null,
+      role: "buyer",
+      plan: "free",
+      emailVerified: false,
+      createdAt: new Date(),
+    });
+    vi.mocked(createPendingPayment).mockResolvedValue(false);
+
+    const request = jsonRequest(
+      "http://localhost/api/payments/initialize",
+      { email: "buyer@example.com" },
+    );
+    request.headers.set(
+      "Cookie",
+      "checkam_account_session=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    );
+    const response = await initializePost(request);
+
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({
+      error: "The free full-report limit is used for this 30-day period.",
+    });
+    expect(createPendingPayment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountId: "d9b81d00-b859-4df5-8374-5df9f6a354c6",
+        freeReportLimit: 1,
+      }),
+    );
     expect(fetch).not.toHaveBeenCalled();
   });
 

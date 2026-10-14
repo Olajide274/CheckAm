@@ -63,12 +63,56 @@ async function initializeSchema(client: Pool | PoolClient): Promise<void> {
       ADD COLUMN IF NOT EXISTS properties JSONB DEFAULT '{}'::jsonb,
       ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 
+    CREATE TABLE IF NOT EXISTS user_accounts (
+      id UUID PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      phone TEXT,
+      role TEXT NOT NULL CHECK (role IN ('buyer', 'seller')),
+      plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'premium', 'pro')),
+      email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS account_sessions (
+      token_hash CHAR(64) PRIMARY KEY,
+      account_id UUID NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS account_email_verification_tokens (
+      token_hash CHAR(64) PRIMARY KEY,
+      account_id UUID NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS account_rate_limits (
+      scope TEXT NOT NULL,
+      identifier_hash CHAR(64) NOT NULL,
+      window_started_at TIMESTAMPTZ NOT NULL,
+      request_count INTEGER NOT NULL CHECK (request_count > 0),
+      PRIMARY KEY (scope, identifier_hash)
+    );
+
+    CREATE TABLE IF NOT EXISTS account_usage (
+      id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      account_id UUID NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+      action TEXT NOT NULL CHECK (action IN ('bill_of_sale')),
+      used_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS account_usage_account_action_used_idx
+      ON account_usage (account_id, action, used_at);
+
     CREATE TABLE IF NOT EXISTS payments (
       id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       reference UUID NOT NULL UNIQUE,
       amount INTEGER NOT NULL CHECK (amount = 50000),
       status TEXT NOT NULL CHECK (status IN ('pending', 'success', 'failed')),
       email TEXT NOT NULL,
+      account_id UUID REFERENCES user_accounts(id) ON DELETE SET NULL,
       imei_hash TEXT,
       tac CHAR(8),
       imei_last4 CHAR(4),
@@ -83,6 +127,7 @@ async function initializeSchema(client: Pool | PoolClient): Promise<void> {
     );
 
     ALTER TABLE payments
+      ADD COLUMN IF NOT EXISTS account_id UUID REFERENCES user_accounts(id) ON DELETE SET NULL,
       ADD COLUMN IF NOT EXISTS tac CHAR(8),
       ADD COLUMN IF NOT EXISTS imei_format_valid BOOLEAN,
       ADD COLUMN IF NOT EXISTS imei_luhn_valid BOOLEAN;
@@ -275,37 +320,365 @@ export interface SellerProofStatus {
   proofMime: string | null;
 }
 
+export type AccountRole = "buyer" | "seller";
+export type AccountPlan = "free" | "premium" | "pro";
+
+export interface AccountRecord {
+  id: string;
+  email: string;
+  passwordHash: string;
+  phone: string | null;
+  role: AccountRole;
+  plan: AccountPlan;
+  emailVerified: boolean;
+  createdAt: Date;
+}
+
+export type AccountProfile = Omit<AccountRecord, "passwordHash">;
+
+function mapAccount(row: {
+  id: string;
+  email: string;
+  password_hash: string;
+  phone: string | null;
+  role: AccountRole;
+  plan: AccountPlan;
+  email_verified: boolean;
+  created_at: Date;
+}): AccountRecord {
+  return {
+    id: row.id,
+    email: row.email,
+    passwordHash: row.password_hash,
+    phone: row.phone,
+    role: row.role,
+    plan: row.plan,
+    emailVerified: row.email_verified,
+    createdAt: row.created_at,
+  };
+}
+
+function toAccountProfile(account: AccountRecord): AccountProfile {
+  return {
+    id: account.id,
+    email: account.email,
+    phone: account.phone,
+    role: account.role,
+    plan: account.plan,
+    emailVerified: account.emailVerified,
+    createdAt: account.createdAt,
+  };
+}
+
+export async function createAccount(input: {
+  id: string;
+  email: string;
+  passwordHash: string;
+  phone: string | null;
+  role: AccountRole;
+}): Promise<AccountProfile> {
+  await ensureSchema();
+  const result = await getPool().query<{
+    id: string;
+    email: string;
+    password_hash: string;
+    phone: string | null;
+    role: AccountRole;
+    plan: AccountPlan;
+    email_verified: boolean;
+    created_at: Date;
+  }>(
+    `INSERT INTO user_accounts (id, email, password_hash, phone, role)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id, email, password_hash, phone, role, plan, email_verified, created_at`,
+    [input.id, input.email, input.passwordHash, input.phone, input.role],
+  );
+  const account = mapAccount(result.rows[0]!);
+  return toAccountProfile(account);
+}
+
+export async function getAccountByEmail(
+  email: string,
+): Promise<AccountRecord | null> {
+  await ensureSchema();
+  const result = await getPool().query<{
+    id: string;
+    email: string;
+    password_hash: string;
+    phone: string | null;
+    role: AccountRole;
+    plan: AccountPlan;
+    email_verified: boolean;
+    created_at: Date;
+  }>(
+    `SELECT id, email, password_hash, phone, role, plan, email_verified, created_at
+     FROM user_accounts
+     WHERE email = $1`,
+    [email],
+  );
+  return result.rows[0] ? mapAccount(result.rows[0]) : null;
+}
+
+export async function createAccountSession(input: {
+  tokenHash: string;
+  accountId: string;
+  expiresAt: Date;
+}): Promise<void> {
+  await ensureSchema();
+  const pool = getPool();
+  await pool.query("DELETE FROM account_sessions WHERE expires_at <= NOW()");
+  await pool.query(
+    `INSERT INTO account_sessions (token_hash, account_id, expires_at)
+     VALUES ($1, $2, $3)`,
+    [input.tokenHash, input.accountId, input.expiresAt],
+  );
+}
+
+export async function getAccountBySessionToken(
+  tokenHash: string,
+): Promise<AccountProfile | null> {
+  await ensureSchema();
+  const result = await getPool().query<{
+    id: string;
+    email: string;
+    password_hash: string;
+    phone: string | null;
+    role: AccountRole;
+    plan: AccountPlan;
+    email_verified: boolean;
+    created_at: Date;
+  }>(
+    `SELECT accounts.id, accounts.email, accounts.password_hash,
+            accounts.phone, accounts.role, accounts.plan,
+            accounts.email_verified, accounts.created_at
+     FROM account_sessions AS sessions
+     INNER JOIN user_accounts AS accounts ON accounts.id = sessions.account_id
+     WHERE sessions.token_hash = $1 AND sessions.expires_at > NOW()`,
+    [tokenHash],
+  );
+  if (!result.rows[0]) return null;
+  return toAccountProfile(mapAccount(result.rows[0]));
+}
+
+export async function deleteAccountSession(tokenHash: string): Promise<void> {
+  await ensureSchema();
+  await getPool().query(
+    "DELETE FROM account_sessions WHERE token_hash = $1",
+    [tokenHash],
+  );
+}
+
+export async function createEmailVerificationToken(input: {
+  tokenHash: string;
+  accountId: string;
+  expiresAt: Date;
+}): Promise<void> {
+  await ensureSchema();
+  await getPool().query(
+    "DELETE FROM account_email_verification_tokens WHERE expires_at <= NOW()",
+  );
+  await getPool().query(
+    `INSERT INTO account_email_verification_tokens (token_hash, account_id, expires_at)
+     VALUES ($1, $2, $3)`,
+    [input.tokenHash, input.accountId, input.expiresAt],
+  );
+}
+
+export async function verifyAccountEmail(tokenHash: string): Promise<boolean> {
+  await ensureSchema();
+  const result = await getPool().query(
+    `WITH token AS (
+       DELETE FROM account_email_verification_tokens
+       WHERE token_hash = $1 AND expires_at > NOW()
+       RETURNING account_id
+     )
+     UPDATE user_accounts
+     SET email_verified = TRUE
+     WHERE id = (SELECT account_id FROM token)
+     RETURNING id`,
+    [tokenHash],
+  );
+  return result.rowCount === 1;
+}
+
+export async function consumeAccountRateLimit(input: {
+  scope: string;
+  identifierHash: string;
+  maxRequests: number;
+  windowSeconds: number;
+}): Promise<boolean> {
+  await ensureSchema();
+  await getPool().query(
+    "DELETE FROM account_rate_limits WHERE window_started_at < NOW() - INTERVAL '24 hours'",
+  );
+  const result = await getPool().query<{ request_count: number }>(
+    `INSERT INTO account_rate_limits
+       (scope, identifier_hash, window_started_at, request_count)
+     VALUES ($1, $2, NOW(), 1)
+     ON CONFLICT (scope, identifier_hash) DO UPDATE
+     SET window_started_at = CASE
+           WHEN account_rate_limits.window_started_at <=
+             NOW() - ($3 * INTERVAL '1 second')
+             THEN NOW()
+           ELSE account_rate_limits.window_started_at
+         END,
+         request_count = CASE
+           WHEN account_rate_limits.window_started_at <=
+             NOW() - ($3 * INTERVAL '1 second')
+             THEN 1
+           ELSE account_rate_limits.request_count + 1
+         END
+     RETURNING request_count`,
+    [input.scope, input.identifierHash, input.windowSeconds],
+  );
+  return (result.rows[0]?.request_count ?? input.maxRequests + 1) <=
+    input.maxRequests;
+}
+
+export type AccountUsageAction = "bill_of_sale";
+
+export async function consumeAccountUsage(input: {
+  accountId: string;
+  action: AccountUsageAction;
+  limit: number;
+}): Promise<{ allowed: boolean; used: number }> {
+  await ensureSchema();
+  const client = await getPool().connect();
+
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+      [input.accountId],
+    );
+    const countResult = await client.query<{ usage_count: string }>(
+      `SELECT COUNT(*)::text AS usage_count
+       FROM account_usage
+       WHERE account_id = $1
+         AND action = $2
+         AND used_at > NOW() - INTERVAL '30 days'`,
+      [input.accountId, input.action],
+    );
+    const used = Number(countResult.rows[0]?.usage_count ?? "0");
+    if (used >= input.limit) {
+      await client.query("ROLLBACK");
+      return { allowed: false, used };
+    }
+    await client.query(
+      "INSERT INTO account_usage (account_id, action) VALUES ($1, $2)",
+      [input.accountId, input.action],
+    );
+    await client.query("COMMIT");
+    return { allowed: true, used: used + 1 };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function getAccountUsageCount(input: {
+  accountId: string;
+  action: AccountUsageAction;
+}): Promise<number> {
+  await ensureSchema();
+  const result = await getPool().query<{ usage_count: string }>(
+    `SELECT COUNT(*)::text AS usage_count
+     FROM account_usage
+     WHERE account_id = $1
+       AND action = $2
+       AND used_at > NOW() - INTERVAL '30 days'`,
+    [input.accountId, input.action],
+  );
+  return Number(result.rows[0]?.usage_count ?? "0");
+}
+
+export async function getAccountReportUsageCount(
+  accountId: string,
+): Promise<number> {
+  await ensureSchema();
+  const result = await getPool().query<{ payment_count: string }>(
+    `SELECT COUNT(*)::text AS payment_count
+     FROM payments
+     WHERE account_id = $1
+       AND (
+         (status = 'success' AND created_at > NOW() - INTERVAL '30 days')
+         OR (status = 'pending' AND created_at > NOW() - INTERVAL '30 minutes')
+       )`,
+    [accountId],
+  );
+  return Number(result.rows[0]?.payment_count ?? "0");
+}
+
 export async function createPendingPayment(input: {
   reference: string;
   email: string;
+  accountId?: string | null;
+  freeReportLimit?: number;
   imeiHash: string | null;
   tac: string | null;
   imeiLast4: string | null;
   imeiFormatValid: boolean | null;
   imeiLuhnValid: boolean | null;
-}): Promise<void> {
+}): Promise<boolean> {
   await ensureSchema();
   const pool = getPool();
-  await pool.query(
-    `UPDATE payments
-     SET status = 'failed'
-     WHERE status = 'pending'
-       AND created_at <= NOW() - INTERVAL '30 minutes'`,
-  );
-  await pool.query(
-    `INSERT INTO payments
-       (reference, amount, status, email, imei_hash, tac, imei_last4, imei_format_valid, imei_luhn_valid)
-     VALUES ($1, 50000, 'pending', $2, $3, $4, $5, $6, $7)`,
-    [
-      input.reference,
-      input.email,
-      input.imeiHash,
-      input.tac,
-      input.imeiLast4,
-      input.imeiFormatValid,
-      input.imeiLuhnValid,
-    ],
-  );
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `UPDATE payments
+       SET status = 'failed'
+       WHERE status = 'pending'
+         AND created_at <= NOW() - INTERVAL '30 minutes'`,
+    );
+    if (input.accountId && input.freeReportLimit !== undefined) {
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [input.accountId],
+      );
+      const usage = await client.query<{ payment_count: string }>(
+        `SELECT COUNT(*)::text AS payment_count
+         FROM payments
+         WHERE account_id = $1
+           AND (
+             (status = 'success' AND created_at > NOW() - INTERVAL '30 days')
+             OR (status = 'pending' AND created_at > NOW() - INTERVAL '30 minutes')
+           )`,
+        [input.accountId],
+      );
+      if (
+        Number(usage.rows[0]?.payment_count ?? "0") >= input.freeReportLimit
+      ) {
+        await client.query("ROLLBACK");
+        return false;
+      }
+    }
+    await client.query(
+      `INSERT INTO payments
+         (reference, amount, status, email, account_id, imei_hash, tac, imei_last4, imei_format_valid, imei_luhn_valid)
+       VALUES ($1, 50000, 'pending', $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        input.reference,
+        input.email,
+        input.accountId ?? null,
+        input.imeiHash,
+        input.tac,
+        input.imeiLast4,
+        input.imeiFormatValid,
+        input.imeiLuhnValid,
+      ],
+    );
+    await client.query("COMMIT");
+    return true;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function getPaymentByReference(

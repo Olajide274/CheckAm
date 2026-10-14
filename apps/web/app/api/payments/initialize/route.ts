@@ -1,6 +1,8 @@
 import { arePaymentsEnabled } from "@/lib/features";
 import { enforcePaymentRateLimit } from "@/lib/payment-rate-limit";
 import { initializePayment, PaymentFlowError, getPaymentCallbackUrl } from "@/lib/payments";
+import { getAccountForRequest } from "@/lib/accounts";
+import { FREE_BUYER_FULL_REPORTS_PER_30_DAYS } from "@/lib/entitlements";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -38,10 +40,19 @@ export async function POST(request: Request) {
       imei = body.imei;
     }
 
+    const account = await getAccountForRequest(request);
     const result = await initializePayment({
       email: body.email,
       imei,
       callbackUrl: getPaymentCallbackUrl(request.url),
+      ...(account
+        ? {
+            accountId: account.id,
+            ...(account.role === "buyer" && account.plan === "free"
+              ? { freeReportLimit: FREE_BUYER_FULL_REPORTS_PER_30_DAYS }
+              : {}),
+          }
+        : {}),
     });
 
     return Response.json(

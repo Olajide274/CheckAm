@@ -11,6 +11,7 @@ import {
   validateBillOfSale,
 } from "@/lib/bill-of-sale";
 import { CheckAmLogo } from "@/components/checkam-logo";
+import { AccountNavigation } from "@/components/account-navigation";
 
 function subscribeToHashChange(onChange: () => void) {
   window.addEventListener("hashchange", onChange);
@@ -136,7 +137,10 @@ export default function BillOfSaleGenerator() {
       <div className="bill-page-inner">
         <header className="bill-page-header">
           <CheckAmLogo />
-          <Link href="/">Back to CheckAm</Link>
+          <div className="bill-header-actions">
+            <AccountNavigation />
+            <Link href="/">Back to CheckAm</Link>
+          </div>
         </header>
         <h1 className="bill-heading">Bill of sale</h1>
         <p className="bill-intro">

@@ -1,5 +1,5 @@
-import { ComingSoonPage } from "@/components/coming-soon-page";
+import { redirect } from "next/navigation";
 
 export default function AppHomePage() {
-  return <ComingSoonPage />;
+  redirect("/dashboard");
 }

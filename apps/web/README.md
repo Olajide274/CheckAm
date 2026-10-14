@@ -1,9 +1,8 @@
 # CheckAm web
 
-Mobile-first CheckAm landing page, paid device report, and early-access
-waitlist. The `/login` and `/app` routes currently show a Coming soon page; the
-OTP implementation remains in the repository but is not exposed on the public
-site.
+Mobile-first CheckAm landing page, paid device report, early-access waitlist,
+and email-first accounts with role dashboards. The separate phone OTP API
+remains in the repository but is not exposed by the web sign-in flow.
 
 ## Run locally
 
@@ -14,17 +13,58 @@ npm ci
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/checkam npm run dev
 ```
 
-Open http://localhost:3000. The database tables are created when the first waitlist or analytics request is received. Set `DATABASE_URL` in the environment for a non-local database; the URL above uses credentials configured by the local Compose service only.
+Open http://localhost:3000. The web app creates its tables on first database
+use. Set `DATABASE_URL` in the environment for a non-local database; the URL
+above uses credentials configured by the local Compose service only.
 
 For Neon, set `DATABASE_URL` to your Neon connection string. The app creates
-`waitlist_signups` and `analytics_events` automatically on the first waitlist or
-analytics request. To create them in advance, run
+waitlist, analytics, account, payment, TAC, and Seller Proof tables on first
+use. To create them in advance, run
 [db/neon-schema.sql](./db/neon-schema.sql) in the Neon SQL Editor.
 
 The free IMEI form checks only the 15-digit format and Luhn checksum in the
 browser. It does not identify the model or check whether a user report exists.
 When payments are enabled, the ₦500 paid report shows the TAC model lookup and
 report status.
+
+## Accounts, dashboards, and free limits
+
+Register at `/register` with a valid email, a password of at least 12
+characters, and a required buyer or seller role. Phone is optional, stored for
+possible later verification, and not verified or sent by SMS in this phase.
+Passwords are hashed with Node.js scrypt and never logged.
+
+Sign-in creates a random opaque session token in an `HttpOnly`,
+`SameSite=Lax` cookie (also `Secure` in production). The token hash is stored in
+PostgreSQL; sessions expire after 30 days. Logout deletes the server session
+and expires the cookie. Registration and login are rate-limited by hashed client
+address and email identifiers. Set `ACCOUNT_RATE_LIMIT_SECRET` to a
+server-only random secret of at least 32 characters in Production and Preview;
+development uses a local-only fallback.
+
+Email verification is a non-blocking soft reminder. No email provider is
+connected. In development only, registration logs a short-lived verification
+token without logging the email; submit it to `POST /api/accounts/verify-email`
+to mark the address verified. An unverified account can still use the app.
+
+- **Buyer Free:** unlimited format/Luhn-only IMEI checks and one full-report
+  checkout per rolling 30 days. A checkout uses the existing one-time ₦500
+  Paystack payment; a pending checkout reserves the quota until it succeeds
+  or expires. The server serializes quota checks with payment creation. Premium
+  and Pro are data-model values only and have no checkout.
+- **Seller Free:** two bill-of-sale actions per rolling 30 days when signed in.
+  Premium and Pro are data-model values only and have no checkout. Anonymous
+  bill-of-sale use remains unchanged.
+
+Anonymous visitors can continue the existing optional paid-report flow and
+aren't required to register. Their payment behavior remains governed by the
+existing Paystack feature flag and key-mode safeguards. `/dashboard` requires
+an account. The seller shop destination is only a coming-soon stub.
+
+To start, configure `DATABASE_URL` and run `npm run dev` from `apps/web`, then
+open `/register`. Account tables and indexes are created on first database
+use, or can be installed ahead of time with the idempotent SQL in
+[`db/neon-schema.sql`](./db/neon-schema.sql).
 
 ## Bill of sale
 

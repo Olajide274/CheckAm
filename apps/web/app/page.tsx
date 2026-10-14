@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { CheckAmLogo } from "@/components/checkam-logo";
+import { AccountNavigation } from "@/components/account-navigation";
 import { arePaymentsEnabled, isBillOfSaleEnabled } from "@/lib/features";
 import { isValidImei } from "@/lib/imei";
 import { trackEvent } from "@/lib/track-event";
@@ -268,6 +269,7 @@ export default function Home() {
         <div className="header-inner">
           <CheckAmLogo />
           <div className="header-actions">
+            <AccountNavigation showPricing={false} />
             {isBillOfSaleEnabled() && (
               <a className="header-link" href="/bill-of-sale">
                 Bill of sale
@@ -375,7 +377,7 @@ export default function Home() {
                 proof of ownership, legality or safety.
               </p>
             </form>
-            <div className="report-callout">
+            <div className="report-callout" id="payment-report">
               {paymentState === "confirming" && (
                 <p className="form-message" role="status">
                   Confirming payment…
