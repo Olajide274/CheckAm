@@ -49,7 +49,7 @@ a {
 }
 
 .site-header {
-  height: 76px;
+  min-height: 76px;
   background: var(--paper);
 }
 
@@ -62,7 +62,7 @@ a {
 }
 
 .header-inner {
-  height: 100%;
+  min-height: 76px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -129,6 +129,22 @@ a {
   gap: 18px;
 }
 
+.account-nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.account-name {
+  max-width: 180px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .header-login-link {
   color: var(--ink);
   font-size: 13px;
@@ -165,6 +181,24 @@ a {
   border-radius: 22px;
   background: #fffefa;
   box-shadow: 0 18px 50px rgb(25 45 42 / 7%);
+}
+
+.account-page > .login-card,
+.account-page > .app-content,
+.pricing-content {
+  animation: account-page-enter 220ms ease-out both;
+}
+
+@keyframes account-page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .login-eyebrow,
@@ -301,6 +335,58 @@ a {
   cursor: pointer;
 }
 
+.login-card,
+.pricing-card,
+.dashboard-action-link,
+.login-submit,
+.app-check-link,
+.header-link,
+.account-logout {
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.pricing-card:hover,
+.dashboard-action-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgb(25 45 42 / 7%);
+}
+
+.login-submit:hover:not(:disabled),
+.app-check-link:hover {
+  background-color: var(--green-dark);
+}
+
+.header-link:hover,
+.account-logout:hover {
+  color: var(--green-dark);
+}
+
+.feedback-success,
+.feedback-error {
+  margin: 8px 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.feedback-success {
+  border: 1px solid #c9e4d5;
+  background: #edf8f1;
+  color: #205b3c;
+}
+
+.feedback-error {
+  border: 1px solid #f0ccc6;
+  background: #fff1ee;
+  color: #92392f;
+}
+
 .verification-notice,
 .entitlement-summary,
 .privacy-note {
@@ -322,6 +408,32 @@ a {
   flex-wrap: wrap;
   gap: 12px;
   margin: 24px 0;
+}
+
+.account-handle {
+  margin: 6px 0 0;
+  color: var(--green);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.settings-account-type {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 14px 0;
+  padding: 14px;
+  border-radius: 10px;
+  background: #f1f4ec;
+  color: var(--muted);
+  font-size: 13px;
+  text-transform: capitalize;
+}
+
+.settings-section-title {
+  margin: 16px 0 0;
+  font-size: 18px;
 }
 
 .dashboard-action-link {
@@ -377,15 +489,28 @@ a {
   background: #fffefa;
 }
 
+.pricing-card.featured {
+  border-color: #a9cbbb;
+  box-shadow: 0 10px 30px rgb(25 45 42 / 6%);
+}
+
 .pricing-card h3 {
   margin: 0;
   font-size: 20px;
 }
 
-.pricing-card > p {
+.pricing-card .pricing-price {
+  margin: 12px 0 0;
   color: var(--green);
   font-size: 18px;
   font-weight: 700;
+}
+
+.pricing-card .pricing-description {
+  margin: 8px 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .pricing-card ul {
@@ -402,6 +527,18 @@ a {
 .pricing-card .app-check-link {
   min-height: 42px;
   font-size: 12px;
+}
+
+.pricing-unavailable {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #f3f4f0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: not-allowed;
 }
 
 .bill-header-actions {
@@ -1245,7 +1382,7 @@ a {
 
 @media (max-width: 699px) {
   .site-header {
-    height: 65px;
+    min-height: 65px;
   }
 
   .header-inner,
@@ -1253,6 +1390,14 @@ a {
   .section-inner,
   .hero-inner {
     width: min(100% - 36px, 520px);
+  }
+
+  .header-inner {
+    min-height: 65px;
+    height: auto;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: 10px 0;
   }
 
   .brand-wordmark {
@@ -1271,6 +1416,24 @@ a {
 
   .header-actions {
     gap: 12px;
+  }
+
+  .account-nav {
+    width: 100%;
+    max-width: 100%;
+    gap: 16px;
+    overflow-x: auto;
+    padding-bottom: 3px;
+    scrollbar-width: none;
+    white-space: nowrap;
+  }
+
+  .account-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .account-name {
+    max-width: 140px;
   }
 
   .header-inner > .header-actions {

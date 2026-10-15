@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 type AccountSummary = {
   email: string;
+  fullName: string;
+  username: string | null;
   role: "buyer" | "seller";
 };
 
@@ -13,6 +16,7 @@ export function AccountNavigation({
 }: {
   showPricing?: boolean;
 }) {
+  const router = useRouter();
   const [account, setAccount] = useState<AccountSummary | null>(null);
   const [sessionState, setSessionState] = useState<
     "loading" | "anonymous" | "authenticated" | "error"
@@ -56,7 +60,8 @@ export function AccountNavigation({
       }
       setAccount(null);
       setSessionState("anonymous");
-      window.location.reload();
+      router.push("/login?notice=signed-out");
+      router.refresh();
     } catch (error) {
       console.error("Account logout request failed.", error);
       setLogoutError("Unable to sign out. Please try again.");
@@ -64,12 +69,7 @@ export function AccountNavigation({
   }
 
   return (
-    <div className="header-actions">
-      {showPricing && (
-        <Link className="header-link" href="/pricing">
-          Pricing
-        </Link>
-      )}
+    <nav aria-label="Account navigation" className="account-nav">
       {sessionState === "loading" ? (
         <span className="header-login-link">Checking account…</span>
       ) : sessionState === "error" ? (
@@ -83,15 +83,35 @@ export function AccountNavigation({
         </>
       ) : account ? (
         <>
-          <Link className="header-login-link" href="/dashboard">
-            {account.email}
+          <Link className="header-link" href="/dashboard">
+            Dashboard
           </Link>
+          <Link className="header-link" href="/#imei-check">
+            Check IMEI
+          </Link>
+          {showPricing && (
+            <Link className="header-link" href="/pricing">
+              Pricing
+            </Link>
+          )}
+          <Link className="header-link" href="/settings">
+            Account
+          </Link>
+          <span className="account-name">
+            {account.fullName}
+            {account.username && <span> @{account.username}</span>}
+          </span>
           <button className="header-login-link account-logout" onClick={logout} type="button">
             Log out
           </button>
         </>
       ) : (
         <>
+          {showPricing && (
+            <Link className="header-link" href="/pricing">
+              Pricing
+            </Link>
+          )}
           <Link className="header-login-link" href="/login">
             Sign in
           </Link>
@@ -105,6 +125,6 @@ export function AccountNavigation({
           {logoutError}
         </span>
       )}
-    </div>
+    </nav>
   );
 }

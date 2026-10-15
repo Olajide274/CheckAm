@@ -445,6 +445,8 @@ describe("payment routes", () => {
     vi.mocked(getAccountBySessionToken).mockResolvedValue({
       id: "d9b81d00-b859-4df5-8374-5df9f6a354c6",
       email: "buyer@example.com",
+      fullName: "Buyer Example",
+      username: null,
       phone: null,
       role: "buyer",
       plan: "free",

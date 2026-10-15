@@ -16,6 +16,17 @@ export function isSellerProofEnabled(
   return featureFlag === "true";
 }
 
+export function shouldShowEmailVerificationNotice(input: {
+  emailVerified: boolean;
+  appEnv: string | undefined;
+  emailProvider: string | undefined;
+}): boolean {
+  return (
+    !input.emailVerified &&
+    (input.appEnv !== "production" || !input.emailProvider)
+  );
+}
+
 export function resolvePaymentsFlag(
   featureFlag: string | undefined,
 ): string {

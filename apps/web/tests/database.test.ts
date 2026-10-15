@@ -53,6 +53,12 @@ describe("database schema bootstrap", () => {
       "CREATE TABLE IF NOT EXISTS seller_proof_requests",
     );
     expect(schemaQuery).toContain("CREATE TABLE IF NOT EXISTS user_accounts");
+    expect(schemaQuery).toContain("ADD COLUMN IF NOT EXISTS full_name TEXT");
+    expect(schemaQuery).toContain("ADD COLUMN IF NOT EXISTS username TEXT");
+    expect(schemaQuery).toContain("ALTER COLUMN full_name SET NOT NULL");
+    expect(schemaQuery).toContain(
+      "CREATE UNIQUE INDEX IF NOT EXISTS user_accounts_username_unique_idx",
+    );
     expect(schemaQuery).toContain("CREATE TABLE IF NOT EXISTS account_sessions");
     expect(schemaQuery).toContain(
       "CREATE TABLE IF NOT EXISTS account_rate_limits",

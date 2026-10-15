@@ -4,21 +4,70 @@ import {
   FREE_BUYER_FULL_REPORTS_PER_30_DAYS,
   FREE_SELLER_BILL_OF_SALE_USES_PER_30_DAYS,
 } from "@/lib/entitlements";
-
-const paidPlans = [
-  {
-    name: "Premium",
-    description:
-      "Additional buyer and seller features are planned. No payment is available.",
-  },
-  {
-    name: "Pro",
-    description:
-      "Higher-volume buyer and seller tools are planned. No payment is available.",
-  },
-] as const;
+import { isBillOfSaleEnabled } from "@/lib/features";
 
 export default function PricingPage() {
+  const billOfSaleEnabled = isBillOfSaleEnabled();
+  const buyerPlans = [
+    {
+      name: "Free",
+      price: "₦0",
+      description: "A practical starting point for every buyer.",
+      features: [
+        "Unlimited IMEI format and Luhn checks",
+        `${FREE_BUYER_FULL_REPORTS_PER_30_DAYS} full report checkout per rolling 30 days`,
+        "One-time full report checkout is ₦500",
+      ],
+      cta: "Create free account",
+      href: "/register",
+    },
+    {
+      name: "Premium",
+      price: "Coming soon",
+      description: "More report access is planned.",
+      features: ["Planned for regular buyers", "No subscription checkout yet"],
+      cta: "Not available yet",
+    },
+    {
+      name: "Pro",
+      price: "Coming soon",
+      description: "Higher-volume buyer access is planned.",
+      features: ["Planned for frequent buyers", "No subscription checkout yet"],
+      cta: "Not available yet",
+    },
+  ] as const;
+  const sellerPlans = [
+    {
+      name: "Free",
+      price: "₦0",
+      description: "Tools to help with your next device sale.",
+      features: [
+        `${FREE_SELLER_BILL_OF_SALE_USES_PER_30_DAYS} bill of sale actions per rolling 30 days when enabled`,
+        ...(!billOfSaleEnabled
+          ? ["Bill of sale isn’t available on this deployment"]
+          : []),
+        "Respond to a buyer’s Seller Proof request",
+        "Shop page coming soon; no listings are available",
+      ],
+      cta: "Create free account",
+      href: "/register",
+    },
+    {
+      name: "Premium",
+      price: "Coming soon",
+      description: "More seller usage is planned.",
+      features: ["Planned for active sellers", "No subscription checkout yet"],
+      cta: "Not available yet",
+    },
+    {
+      name: "Pro",
+      price: "Coming soon",
+      description: "Higher-volume seller access is planned.",
+      features: ["Planned for frequent sellers", "No subscription checkout yet"],
+      cta: "Not available yet",
+    },
+  ] as const;
+
   return (
     <main className="account-page">
       <AccountHeader />
@@ -26,78 +75,66 @@ export default function PricingPage() {
         <p className="login-eyebrow">PLANS</p>
         <h1>Choose how you use CheckAm</h1>
         <p className="login-description">
-          Free account limits are enforced by the server. Premium and Pro are
-          shown for planning only; subscription checkout is not available.
+          Start free. Premium and Pro plans are presented for what’s planned;
+          billing is not available yet.
         </p>
 
         <div className="pricing-roles">
           <section aria-labelledby="buyer-plans">
-            <h2 id="buyer-plans">For buyers</h2>
+            <h2 id="buyer-plans">Buyer plans</h2>
             <div className="pricing-cards">
-              <article className="pricing-card">
-                <h3>Free</h3>
-                <p>₦0</p>
-                <ul>
-                  <li>Unlimited IMEI format and Luhn checks</li>
-                  <li>
-                    Up to {FREE_BUYER_FULL_REPORTS_PER_30_DAYS} full report
-                    unlock per rolling 30 days
-                  </li>
-                  <li>Report unlocks use the existing ₦500 one-time checkout</li>
-                  <li>Buyer dashboard</li>
-                </ul>
-                <Link className="app-check-link" href="/register">
-                  Create free account
-                </Link>
-              </article>
-              {paidPlans.map((plan) => (
-                <article className="pricing-card" key={plan.name}>
+              {buyerPlans.map((plan) => (
+                <article
+                  className={`pricing-card${plan.name === "Free" ? " featured" : ""}`}
+                  key={plan.name}
+                >
                   <h3>{plan.name}</h3>
-                  <p>Coming soon</p>
-                  <ul>
-                    <li>{plan.description}</li>
-                    <li>No subscription checkout or recurring charge</li>
-                  </ul>
+                  <p className="pricing-price">{plan.price}</p>
+                  <p className="pricing-description">{plan.description}</p>
+                  <ul>{plan.features.map((feature) => <li key={feature}>{feature}</li>)}</ul>
+                  {"href" in plan ? (
+                    <Link className="app-check-link" href={plan.href}>
+                      {plan.cta}
+                    </Link>
+                  ) : (
+                    <button className="pricing-unavailable" disabled type="button">
+                      {plan.cta}
+                    </button>
+                  )}
                 </article>
               ))}
             </div>
           </section>
 
           <section aria-labelledby="seller-plans">
-            <h2 id="seller-plans">For sellers</h2>
+            <h2 id="seller-plans">Seller plans</h2>
             <div className="pricing-cards">
-              <article className="pricing-card">
-                <h3>Free</h3>
-                <p>₦0</p>
-                <ul>
-                  <li>
-                    Up to {FREE_SELLER_BILL_OF_SALE_USES_PER_30_DAYS} bill of
-                    sale actions per rolling 30 days when signed in and the
-                    generator is enabled
-                  </li>
-                  <li>Respond to a buyer&apos;s Seller Proof request</li>
-                  <li>Shop page coming soon; no listings are available</li>
-                </ul>
-                <Link className="app-check-link" href="/register">
-                  Create free account
-                </Link>
-              </article>
-              {paidPlans.map((plan) => (
-                <article className="pricing-card" key={plan.name}>
+              {sellerPlans.map((plan) => (
+                <article
+                  className={`pricing-card${plan.name === "Free" ? " featured" : ""}`}
+                  key={plan.name}
+                >
                   <h3>{plan.name}</h3>
-                  <p>Coming soon</p>
-                  <ul>
-                    <li>{plan.description}</li>
-                    <li>No subscription checkout or recurring charge</li>
-                  </ul>
+                  <p className="pricing-price">{plan.price}</p>
+                  <p className="pricing-description">{plan.description}</p>
+                  <ul>{plan.features.map((feature) => <li key={feature}>{feature}</li>)}</ul>
+                  {"href" in plan ? (
+                    <Link className="app-check-link" href={plan.href}>
+                      {plan.cta}
+                    </Link>
+                  ) : (
+                    <button className="pricing-unavailable" disabled type="button">
+                      {plan.cta}
+                    </button>
+                  )}
                 </article>
               ))}
             </div>
           </section>
         </div>
         <p className="privacy-note">
-          Phone is optional and is not verified in this phase. Public device
-          results continue to use the existing user-reported wording and
+          Free account limits are applied by CheckAm. Phone is optional. Public
+          device results continue to use the existing user-reported wording and
           disclaimer.
         </p>
       </section>

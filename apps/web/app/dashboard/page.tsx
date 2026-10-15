@@ -3,6 +3,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { AccountHeader } from "@/components/account-header";
+import { AccountNotice } from "@/components/account-notice";
 import { getAccountForToken } from "@/lib/accounts";
 import {
   getAccountReportUsageCount,
@@ -12,7 +13,10 @@ import {
   FREE_BUYER_FULL_REPORTS_PER_30_DAYS,
   FREE_SELLER_BILL_OF_SALE_USES_PER_30_DAYS,
 } from "@/lib/entitlements";
-import { isBillOfSaleEnabled } from "@/lib/features";
+import {
+  isBillOfSaleEnabled,
+  shouldShowEmailVerificationNotice,
+} from "@/lib/features";
 
 export default function DashboardPage() {
   return (
@@ -55,24 +59,32 @@ async function DashboardContent() {
       <section className="app-content">
         <div className="app-welcome">
           <p className="app-eyebrow">{account.role.toUpperCase()} DASHBOARD</p>
-          <h1>Welcome to CheckAm</h1>
+          <AccountNotice />
+          <h1>Welcome, {account.fullName}</h1>
+          {account.username && (
+            <p className="account-handle">@{account.username}</p>
+          )}
           <p className="app-description">
-            Signed in as {account.email}. Your current plan is{" "}
-            <strong>{account.plan}</strong>.
+            {account.email} · Your current plan is <strong>{account.plan}</strong>.
           </p>
-          {!account.emailVerified && (
+          {shouldShowEmailVerificationNotice({
+            emailVerified: account.emailVerified,
+            appEnv: process.env.APP_ENV,
+            emailProvider: process.env.EMAIL_PROVIDER,
+          }) && (
             <p className="verification-notice" role="status">
-              Your email is not verified yet. You can use your account; email
-              delivery is not connected in this phase.
+              Your email isn’t verified yet. You can still use CheckAm.
             </p>
           )}
           {account.role === "buyer" ? (
             <>
-              <p className="entitlement-summary">
-                Full report access: {reportUsage} of{" "}
-                {FREE_BUYER_FULL_REPORTS_PER_30_DAYS} used in the rolling
-                30-day period. Format-only IMEI checks remain unlimited.
-              </p>
+              {account.plan === "free" && (
+                <p className="entitlement-summary">
+                  Full report access: {reportUsage ?? 0} of{" "}
+                  {FREE_BUYER_FULL_REPORTS_PER_30_DAYS} used in the rolling
+                  30-day period. Format-only IMEI checks remain unlimited.
+                </p>
+              )}
               <div className="dashboard-actions">
                 <Link className="app-check-link" href="/#imei-check">
                   Check an IMEI
@@ -84,11 +96,7 @@ async function DashboardContent() {
                   <Link className="dashboard-action-link" href="/bill-of-sale">
                     Bill of sale
                   </Link>
-                ) : (
-                  <Link className="dashboard-action-link" href="/pricing">
-                    Bill of sale (coming soon)
-                  </Link>
-                )}
+                ) : null}
                 <Link className="dashboard-action-link" href="/pricing">
                   Seller Proof information
                 </Link>
@@ -96,11 +104,13 @@ async function DashboardContent() {
             </>
           ) : (
             <>
-              <p className="entitlement-summary">
-                Bill of sale actions: {billOfSaleUsage} of{" "}
-                {FREE_SELLER_BILL_OF_SALE_USES_PER_30_DAYS} used in the rolling
-                30-day period on this account.
-              </p>
+              {account.plan === "free" && (
+                <p className="entitlement-summary">
+                  Bill of sale actions: {billOfSaleUsage ?? 0} of{" "}
+                  {FREE_SELLER_BILL_OF_SALE_USES_PER_30_DAYS} used in the rolling
+                  30-day period on this account.
+                </p>
+              )}
               <div className="dashboard-actions">
                 {isBillOfSaleEnabled() ? (
                   <Link
@@ -110,11 +120,7 @@ async function DashboardContent() {
                   >
                     Create a bill of sale
                   </Link>
-                ) : (
-                  <Link className="dashboard-action-link" href="/pricing">
-                    Bill of sale (coming soon)
-                  </Link>
-                )}
+                ) : null}
                 <Link className="dashboard-action-link" href="/pricing">
                   Seller Proof: learn how to respond to a buyer&apos;s request
                 </Link>
@@ -122,6 +128,11 @@ async function DashboardContent() {
                   Shop page coming soon
                 </Link>
               </div>
+              {!isBillOfSaleEnabled() && (
+                <p className="login-hint">
+                  Bill of sale isn’t available on this deployment.
+                </p>
+              )}
               <p className="login-hint" id="shop">
                 A shop page is not available yet. No listings or shop data are
                 collected in this phase.

@@ -15,6 +15,8 @@ export function LoginForm({ mode }: Props) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState("");
   const [error, setError] = useState("");
@@ -32,7 +34,7 @@ export function LoginForm({ mode }: Props) {
         body: JSON.stringify({
           email,
           password,
-          ...(mode === "register" ? { phone, role } : {}),
+          ...(mode === "register" ? { fullName, username, phone, role } : {}),
         }),
       });
 
@@ -42,7 +44,7 @@ export function LoginForm({ mode }: Props) {
         return;
       }
 
-      router.replace("/dashboard");
+      router.replace(`/dashboard?notice=${mode === "register" ? "registered" : "signed-in"}`);
       router.refresh();
     } catch {
       setError("Unable to reach CheckAm. Check your connection and try again.");
@@ -64,6 +66,31 @@ export function LoginForm({ mode }: Props) {
         type="email"
         value={email}
       />
+
+      {mode === "register" && (
+        <>
+          <label htmlFor="account-full-name">Full name</label>
+          <input
+            autoComplete="name"
+            id="account-full-name"
+            maxLength={100}
+            onChange={(event) => setFullName(event.target.value)}
+            required
+            type="text"
+            value={fullName}
+          />
+          <label htmlFor="account-username">Username (optional)</label>
+          <input
+            autoComplete="username"
+            id="account-username"
+            maxLength={25}
+            onChange={(event) => setUsername(event.target.value)}
+            placeholder="@yourname"
+            type="text"
+            value={username}
+          />
+        </>
+      )}
 
       <label htmlFor={`${mode}-password`}>Password</label>
       <input

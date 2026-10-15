@@ -77,6 +77,26 @@ export function normalizeAccountEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+export function validateAccountFullName(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const fullName = value.trim();
+  return fullName.length > 0 && fullName.length <= 100
+    ? fullName
+    : undefined;
+}
+
+export function normalizeAccountUsername(
+  value: unknown,
+): string | null | undefined {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string") return undefined;
+  const username = value.trim().replace(/^@/, "").toLowerCase();
+  if (!username) return null;
+  return /^[a-z0-9][a-z0-9_]{2,23}$/.test(username)
+    ? username
+    : undefined;
+}
+
 export function isAccountRole(value: unknown): value is Role {
   return value === "buyer" || value === "seller";
 }

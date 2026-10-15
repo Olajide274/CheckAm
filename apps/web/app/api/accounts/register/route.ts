@@ -6,7 +6,9 @@ import {
   hashPassword,
   isAccountRole,
   isValidAccountEmail,
+  normalizeAccountUsername,
   normalizeAccountEmail,
+  validateAccountFullName,
   validateAccountPhone,
 } from "@/lib/accounts";
 import {
@@ -30,6 +32,17 @@ export async function POST(request: Request): Promise<Response> {
     typeof body.email === "string" ? normalizeAccountEmail(body.email) : "";
   if (!isValidAccountEmail(email)) {
     return accountError(400, "Enter a valid email address.");
+  }
+  const fullName = validateAccountFullName(body.fullName);
+  if (!fullName) {
+    return accountError(400, "Enter your full name.");
+  }
+  const username = normalizeAccountUsername(body.username);
+  if (username === undefined) {
+    return accountError(
+      400,
+      "Username must be 3 to 24 letters, numbers, or underscores.",
+    );
   }
   if (
     typeof body.password !== "string" ||
@@ -58,6 +71,8 @@ export async function POST(request: Request): Promise<Response> {
       id: randomUUID(),
       email,
       passwordHash: await hashPassword(body.password),
+      fullName,
+      username,
       phone,
       role: body.role,
     });
@@ -83,6 +98,8 @@ export async function POST(request: Request): Promise<Response> {
         account: {
           id: account.id,
           email: account.email,
+          fullName: account.fullName,
+          username: account.username,
           phone: account.phone,
           role: account.role,
           plan: account.plan,
@@ -99,6 +116,12 @@ export async function POST(request: Request): Promise<Response> {
       "code" in error &&
       error.code === "23505"
     ) {
+      if (
+        "constraint" in error &&
+        error.constraint === "user_accounts_username_unique_idx"
+      ) {
+        return accountError(409, "That username is already taken.");
+      }
       return accountError(409, "An account with this email already exists.");
     }
     console.error(

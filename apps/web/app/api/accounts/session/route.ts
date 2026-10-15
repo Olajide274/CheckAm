@@ -22,6 +22,8 @@ export async function GET(request: Request): Promise<Response> {
             account: {
               id: account.id,
               email: account.email,
+              fullName: account.fullName,
+              username: account.username,
               phone: account.phone,
               role: account.role,
               plan: account.plan,

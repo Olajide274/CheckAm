@@ -9,6 +9,13 @@ test("buyer checks IMEI format and joins the feature waitlist", async ({ page })
     analyticsEvents.push(request.event);
     await route.fulfill({ json: { ok: true } });
   });
+  await page.route("**/api/accounts/session", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ authenticated: false }),
+    }),
+  );
   await page.route("**/api/waitlist", async (route) => {
     savedSignup = route.request().postDataJSON() as Record<string, string>;
     await route.fulfill({ status: 201, json: { ok: true } });
@@ -27,7 +34,7 @@ test("buyer checks IMEI format and joins the feature waitlist", async ({ page })
   await page.getByLabel("Phone IMEI").fill("490154203237518");
   await page.getByRole("button", { name: "Check IMEI" }).click();
   await expect(
-    page.getByText("IMEI looks valid – full report coming soon"),
+    page.getByText(/IMEI format looks valid\. This does not tell you/),
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Get the full report – ₦500" }).click();

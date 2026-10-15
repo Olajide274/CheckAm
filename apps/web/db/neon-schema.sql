@@ -47,12 +47,33 @@ CREATE TABLE IF NOT EXISTS user_accounts (
   id UUID PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
+  full_name TEXT NOT NULL,
+  username TEXT,
   phone TEXT,
   role TEXT NOT NULL CHECK (role IN ('buyer', 'seller')),
   plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'premium', 'pro')),
   email_verified BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE user_accounts
+  ADD COLUMN IF NOT EXISTS full_name TEXT,
+  ADD COLUMN IF NOT EXISTS username TEXT;
+
+UPDATE user_accounts
+SET full_name = COALESCE(
+  NULLIF(BTRIM(full_name), ''),
+  NULLIF(SPLIT_PART(email, '@', 1), ''),
+  email
+)
+WHERE full_name IS NULL OR BTRIM(full_name) = '';
+
+ALTER TABLE user_accounts
+  ALTER COLUMN full_name SET NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS user_accounts_username_unique_idx
+  ON user_accounts (LOWER(username))
+  WHERE username IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS account_sessions (
   token_hash CHAR(64) PRIMARY KEY,

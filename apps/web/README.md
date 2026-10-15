@@ -29,10 +29,12 @@ report status.
 
 ## Accounts, dashboards, and free limits
 
-Register at `/register` with a valid email, a password of at least 12
-characters, and a required buyer or seller role. Phone is optional, stored for
-possible later verification, and not verified or sent by SMS in this phase.
-Passwords are hashed with Node.js scrypt and never logged.
+Register at `/register` with your required full name, a valid email, a password
+of at least 12 characters, and a required buyer or seller role. A unique
+username and phone number are optional. Phone is stored for possible later
+verification, and is not verified or sent by SMS. Update your profile or
+password at `/settings`. Passwords are hashed with Node.js scrypt and never
+logged.
 
 Sign-in creates a random opaque session token in an `HttpOnly`,
 `SameSite=Lax` cookie (also `Secure` in production). The token hash is stored in
@@ -42,10 +44,12 @@ address and email identifiers. Set `ACCOUNT_RATE_LIMIT_SECRET` to a
 server-only random secret of at least 32 characters in Production and Preview;
 development uses a local-only fallback.
 
-Email verification is a non-blocking soft reminder. No email provider is
-connected. In development only, registration logs a short-lived verification
-token without logging the email; submit it to `POST /api/accounts/verify-email`
-to mark the address verified. An unverified account can still use the app.
+Email verification is a non-blocking soft reminder. In development only,
+registration logs a short-lived verification token without logging the email;
+submit it to `POST /api/accounts/verify-email` to mark the address verified.
+An unverified account can still use the app. Existing accounts are migrated
+idempotently: the required full name is initially populated from the email
+address, and usernames are unique without regard to case.
 
 - **Buyer Free:** unlimited format/Luhn-only IMEI checks and one full-report
   checkout per rolling 30 days. A checkout uses the existing one-time ₦500

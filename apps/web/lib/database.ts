@@ -67,12 +67,33 @@ async function initializeSchema(client: Pool | PoolClient): Promise<void> {
       id UUID PRIMARY KEY,
       email TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
+      full_name TEXT NOT NULL,
+      username TEXT,
       phone TEXT,
       role TEXT NOT NULL CHECK (role IN ('buyer', 'seller')),
       plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'premium', 'pro')),
       email_verified BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    ALTER TABLE user_accounts
+      ADD COLUMN IF NOT EXISTS full_name TEXT,
+      ADD COLUMN IF NOT EXISTS username TEXT;
+
+    UPDATE user_accounts
+    SET full_name = COALESCE(
+      NULLIF(BTRIM(full_name), ''),
+      NULLIF(SPLIT_PART(email, '@', 1), ''),
+      email
+    )
+    WHERE full_name IS NULL OR BTRIM(full_name) = '';
+
+    ALTER TABLE user_accounts
+      ALTER COLUMN full_name SET NOT NULL;
+
+    CREATE UNIQUE INDEX IF NOT EXISTS user_accounts_username_unique_idx
+      ON user_accounts (LOWER(username))
+      WHERE username IS NOT NULL;
 
     CREATE TABLE IF NOT EXISTS account_sessions (
       token_hash CHAR(64) PRIMARY KEY,
@@ -327,6 +348,8 @@ export interface AccountRecord {
   id: string;
   email: string;
   passwordHash: string;
+  fullName: string;
+  username: string | null;
   phone: string | null;
   role: AccountRole;
   plan: AccountPlan;
@@ -340,6 +363,8 @@ function mapAccount(row: {
   id: string;
   email: string;
   password_hash: string;
+  full_name: string;
+  username: string | null;
   phone: string | null;
   role: AccountRole;
   plan: AccountPlan;
@@ -350,6 +375,8 @@ function mapAccount(row: {
     id: row.id,
     email: row.email,
     passwordHash: row.password_hash,
+    fullName: row.full_name,
+    username: row.username,
     phone: row.phone,
     role: row.role,
     plan: row.plan,
@@ -362,6 +389,8 @@ function toAccountProfile(account: AccountRecord): AccountProfile {
   return {
     id: account.id,
     email: account.email,
+    fullName: account.fullName,
+    username: account.username,
     phone: account.phone,
     role: account.role,
     plan: account.plan,
@@ -374,6 +403,8 @@ export async function createAccount(input: {
   id: string;
   email: string;
   passwordHash: string;
+  fullName: string;
+  username: string | null;
   phone: string | null;
   role: AccountRole;
 }): Promise<AccountProfile> {
@@ -382,16 +413,28 @@ export async function createAccount(input: {
     id: string;
     email: string;
     password_hash: string;
+    full_name: string;
+    username: string | null;
     phone: string | null;
     role: AccountRole;
     plan: AccountPlan;
     email_verified: boolean;
     created_at: Date;
   }>(
-    `INSERT INTO user_accounts (id, email, password_hash, phone, role)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, email, password_hash, phone, role, plan, email_verified, created_at`,
-    [input.id, input.email, input.passwordHash, input.phone, input.role],
+    `INSERT INTO user_accounts
+       (id, email, password_hash, full_name, username, phone, role)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING id, email, password_hash, full_name, username, phone,
+               role, plan, email_verified, created_at`,
+    [
+      input.id,
+      input.email,
+      input.passwordHash,
+      input.fullName,
+      input.username,
+      input.phone,
+      input.role,
+    ],
   );
   const account = mapAccount(result.rows[0]!);
   return toAccountProfile(account);
@@ -405,13 +448,16 @@ export async function getAccountByEmail(
     id: string;
     email: string;
     password_hash: string;
+    full_name: string;
+    username: string | null;
     phone: string | null;
     role: AccountRole;
     plan: AccountPlan;
     email_verified: boolean;
     created_at: Date;
   }>(
-    `SELECT id, email, password_hash, phone, role, plan, email_verified, created_at
+    `SELECT id, email, password_hash, full_name, username, phone, role, plan,
+            email_verified, created_at
      FROM user_accounts
      WHERE email = $1`,
     [email],
@@ -442,6 +488,8 @@ export async function getAccountBySessionToken(
     id: string;
     email: string;
     password_hash: string;
+    full_name: string;
+    username: string | null;
     phone: string | null;
     role: AccountRole;
     plan: AccountPlan;
@@ -449,7 +497,8 @@ export async function getAccountBySessionToken(
     created_at: Date;
   }>(
     `SELECT accounts.id, accounts.email, accounts.password_hash,
-            accounts.phone, accounts.role, accounts.plan,
+            accounts.full_name, accounts.username, accounts.phone,
+            accounts.role, accounts.plan,
             accounts.email_verified, accounts.created_at
      FROM account_sessions AS sessions
      INNER JOIN user_accounts AS accounts ON accounts.id = sessions.account_id
@@ -466,6 +515,46 @@ export async function deleteAccountSession(tokenHash: string): Promise<void> {
     "DELETE FROM account_sessions WHERE token_hash = $1",
     [tokenHash],
   );
+}
+
+export async function updateAccountSettings(input: {
+  accountId: string;
+  fullName: string;
+  username: string | null;
+  phone: string | null;
+  passwordHash?: string;
+}): Promise<AccountProfile> {
+  await ensureSchema();
+  const result = await getPool().query<{
+    id: string;
+    email: string;
+    password_hash: string;
+    full_name: string;
+    username: string | null;
+    phone: string | null;
+    role: AccountRole;
+    plan: AccountPlan;
+    email_verified: boolean;
+    created_at: Date;
+  }>(
+    `UPDATE user_accounts
+     SET full_name = $2,
+         username = $3,
+         phone = $4,
+         password_hash = COALESCE($5, password_hash)
+     WHERE id = $1
+     RETURNING id, email, password_hash, full_name, username, phone,
+               role, plan, email_verified, created_at`,
+    [
+      input.accountId,
+      input.fullName,
+      input.username,
+      input.phone,
+      input.passwordHash ?? null,
+    ],
+  );
+  if (!result.rows[0]) throw new Error("Account settings update matched no account.");
+  return toAccountProfile(mapAccount(result.rows[0]));
 }
 
 export async function createEmailVerificationToken(input: {

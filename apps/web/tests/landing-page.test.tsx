@@ -2,6 +2,10 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest";
 import Home from "@/app/page";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}));
+
 const originalMatchMedia = Object.getOwnPropertyDescriptor(window, "matchMedia");
 const originalBillOfSaleFlag = process.env.FEATURE_BILL_OF_SALE;
 const originalPaymentsFlag = process.env.FEATURE_PAYMENTS;
@@ -86,7 +90,8 @@ describe("landing page", () => {
     );
     render(<Home />);
 
-    expect(document.querySelector('a[href="/login"], a[href="/app"]')).toBeNull();
+    expect(await screen.findByRole("link", { name: "Sign in" })).toBeDefined();
+    expect(screen.getByRole("link", { name: "Create account" })).toBeDefined();
     fireEvent.change(screen.getByLabelText("Phone IMEI"), {
       target: { value: "490154203237518" },
     });
@@ -130,7 +135,7 @@ describe("landing page", () => {
   it("shows the bill of sale link only when the feature flag is enabled", () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }))),
+      vi.fn().mockImplementation(() => Promise.resolve(Response.json({ ok: true }))),
     );
     process.env.FEATURE_BILL_OF_SALE = "true";
     render(<Home />);

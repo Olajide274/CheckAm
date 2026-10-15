@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AccountHeader } from "@/components/account-header";
+import { AccountNotice } from "@/components/account-notice";
 import { LoginForm } from "@/components/login-form";
 
 export default function LoginPage() {
@@ -9,6 +10,7 @@ export default function LoginPage() {
       <section aria-labelledby="login-title" className="login-card">
         <p className="login-eyebrow">WELCOME BACK</p>
         <h1 id="login-title">Sign in</h1>
+        <AccountNotice />
         <p className="login-description">
           Sign in to see your CheckAm dashboard.
         </p>

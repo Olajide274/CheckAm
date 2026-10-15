@@ -6,6 +6,18 @@ import {
   type BillOfSaleData,
 } from "@/lib/bill-of-sale";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}));
+
+vi.mock("@/components/account-header", () => ({
+  AccountHeader: () => null,
+}));
+
+vi.mock("@/components/account-navigation", () => ({
+  AccountNavigation: () => null,
+}));
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();

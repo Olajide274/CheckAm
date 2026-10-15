@@ -10,8 +10,7 @@ export default function RegisterPage() {
         <p className="login-eyebrow">START WITH CHECKAM</p>
         <h1 id="register-title">Create your account</h1>
         <p className="login-description">
-          Choose a buyer or seller account. Email verification is a soft
-          reminder in this phase; no email or SMS provider is connected.
+          Choose a buyer or seller account and make CheckAm yours.
         </p>
         <LoginForm mode="register" />
         <p className="account-switch">

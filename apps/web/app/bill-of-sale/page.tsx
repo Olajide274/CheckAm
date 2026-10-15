@@ -44,7 +44,7 @@ async function BillOfSaleContent() {
           <AccountHeader />
           <section className="login-card">
             <h1>Free bill of sale limit reached</h1>
-            <p className="login-description">
+            <p aria-live="polite" className="feedback-error" role="status">
               Your account has used its two bill of sale actions for this
               rolling 30-day period. Premium and Pro are not available yet.
             </p>
