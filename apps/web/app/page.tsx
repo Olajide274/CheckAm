@@ -268,17 +268,21 @@ export default function Home() {
       <header className="site-header">
         <div className="header-inner">
           <CheckAmLogo />
-          <div className="header-actions">
-            <AccountNavigation showPricing={false} />
-            {isBillOfSaleEnabled() && (
-              <a className="header-link" href="/bill-of-sale">
-                Bill of sale
-              </a>
-            )}
-            <a className="header-link" href="#waitlist">
-              Get early access <span aria-hidden="true">↗</span>
-            </a>
-          </div>
+          <AccountNavigation
+            showPricing={false}
+            marketingActions={
+              <div className="account-marketing-actions">
+                {isBillOfSaleEnabled() && (
+                  <a className="header-link" href="/bill-of-sale">
+                    Bill of sale
+                  </a>
+                )}
+                <a className="header-link" href="#waitlist">
+                  Get early access <span aria-hidden="true">↗</span>
+                </a>
+              </div>
+            }
+          />
         </div>
       </header>
 

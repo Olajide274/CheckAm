@@ -4,6 +4,7 @@ import Home from "@/app/page";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  usePathname: () => "/",
 }));
 
 const originalMatchMedia = Object.getOwnPropertyDescriptor(window, "matchMedia");
@@ -132,7 +133,7 @@ describe("landing page", () => {
     ).toBeDefined();
   });
 
-  it("shows the bill of sale link only when the feature flag is enabled", () => {
+  it("shows the bill of sale link only when the feature flag is enabled", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockImplementation(() => Promise.resolve(Response.json({ ok: true }))),
@@ -140,9 +141,11 @@ describe("landing page", () => {
     process.env.FEATURE_BILL_OF_SALE = "true";
     render(<Home />);
 
-    expect(screen.getByRole("link", { name: "Bill of sale" }).getAttribute("href")).toBe(
-      "/bill-of-sale",
-    );
+    expect(
+      (await screen.findByRole("link", { name: "Bill of sale" })).getAttribute(
+        "href",
+      ),
+    ).toBe("/bill-of-sale");
 
     cleanup();
     process.env.FEATURE_BILL_OF_SALE = "false";

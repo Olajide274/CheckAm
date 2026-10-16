@@ -1,4 +1,11 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { POST as authProxyPost } from "@/app/api/auth/[...segments]/route";
@@ -28,6 +35,7 @@ const { router } = vi.hoisted(() => ({
   router: {
     replace: vi.fn(),
     refresh: vi.fn(),
+    pathname: "/dashboard",
   },
 }));
 
@@ -35,6 +43,7 @@ vi.mock("@/lib/database", () => database);
 
 vi.mock("next/navigation", () => ({
   useRouter: () => router,
+  usePathname: () => router.pathname,
 }));
 
 vi.mock("@/components/account-header", () => ({
@@ -66,6 +75,7 @@ describe("email-first accounts", () => {
     vi.clearAllMocks();
     router.replace.mockReset();
     router.refresh.mockReset();
+    router.pathname = "/dashboard";
     database.consumeAccountRateLimit.mockResolvedValue(true);
     database.createAccount.mockImplementation(async (input) => ({
       ...account,
@@ -382,7 +392,7 @@ describe("email-first accounts", () => {
     expect(database.createAccount).not.toHaveBeenCalled();
   });
 
-  it("shows the logged-in navigation and user's display name", async () => {
+  it("shows separate desktop links and the user's identity", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
@@ -394,12 +404,109 @@ describe("email-first accounts", () => {
     );
     render(<AccountNavigation />);
 
-    expect(await screen.findByRole("link", { name: "Dashboard" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Check IMEI" }).getAttribute("href"))
+    const navigation = await screen.findByRole("navigation", {
+      name: "Account navigation",
+    });
+    const desktopLinks = navigation.querySelector(".account-desktop-links");
+    if (!(desktopLinks instanceof HTMLElement)) {
+      throw new Error("Desktop account links were not rendered.");
+    }
+    expect(desktopLinks?.querySelectorAll("a")).toHaveLength(4);
+    expect(within(desktopLinks).getByRole("link", { name: "Dashboard" }))
+      .toBeTruthy();
+    expect(within(desktopLinks).getByRole("link", { name: "Check IMEI" })
+      .getAttribute("href"))
       .toBe("/#imei-check");
-    expect(screen.getByRole("link", { name: "Account" }).getAttribute("href"))
+    expect(within(desktopLinks).getByRole("link", { name: "Pricing" }))
+      .toBeTruthy();
+    expect(within(desktopLinks).getByRole("link", { name: "Account" })
+      .getAttribute("href"))
       .toBe("/settings");
-    expect(screen.getByText("Buyer Example")).toBeTruthy();
+    expect(within(desktopLinks).getByRole("link", { name: "Dashboard" })
+      .getAttribute("aria-current"))
+      .toBe("page");
+    expect(navigation.querySelector(".account-desktop-name")?.textContent)
+      .toBe("Buyer Example");
+    expect(within(navigation).getByRole("button", { name: "Log out" })).toBeTruthy();
+    expect(within(navigation).getByRole("button", { name: "Open account menu" }))
+      .toBeTruthy();
+  });
+
+  it("opens an accessible account drawer and closes it with Escape or outside click", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ authenticated: true, account }),
+          { status: 200 },
+        ),
+      ),
+    );
+    render(<AccountNavigation />);
+
+    const menuButton = await screen.findByRole("button", {
+      name: "Open account menu",
+    });
+    expect(menuButton.getAttribute("aria-controls")).toBe("account-menu-panel");
+    fireEvent.click(menuButton);
+
+    const menu = screen.getByRole("dialog", { name: "Account menu" });
+    expect(menuButton.getAttribute("aria-expanded")).toBe("true");
+    expect(within(menu).getByText("Buyer Example")).toBeTruthy();
+    expect(within(menu).getByText("@buyer_example")).toBeTruthy();
+    const closeButton = within(menu).getByRole("button", {
+      name: "Close account menu",
+    });
+    const dashboardLink = within(menu).getByRole("link", { name: "Dashboard" });
+    expect(dashboardLink.getAttribute("aria-current")).toBe("page");
+    expect(document.body.style.overflow).toBe("hidden");
+    expect(document.activeElement).toBe(closeButton);
+
+    const logoutButton = within(menu).getByRole("button", { name: "Log out" });
+    logoutButton.focus();
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(document.activeElement).toBe(closeButton);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => {
+      expect(menuButton.getAttribute("aria-expanded")).toBe("false");
+      expect(document.body.style.overflow).toBe("");
+    });
+    expect(document.activeElement).toBe(menuButton);
+
+    fireEvent.click(menuButton);
+    const backdrop = document.querySelector(".account-menu-backdrop");
+    expect(backdrop).not.toBeNull();
+    if (backdrop) fireEvent.click(backdrop);
+    await waitFor(() => {
+      expect(menuButton.getAttribute("aria-expanded")).toBe("false");
+      expect(document.body.style.overflow).toBe("");
+    });
+  });
+
+  it("closes the account drawer when the route changes", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ authenticated: true, account }),
+          { status: 200 },
+        ),
+      ),
+    );
+    const { rerender } = render(<AccountNavigation />);
+
+    const menuButton = await screen.findByRole("button", {
+      name: "Open account menu",
+    });
+    fireEvent.click(menuButton);
+    expect(menuButton.getAttribute("aria-expanded")).toBe("true");
+
+    router.pathname = "/settings";
+    rerender(<AccountNavigation />);
+    await waitFor(() =>
+      expect(menuButton.getAttribute("aria-expanded")).toBe("false"),
+    );
   });
 
   it("shows an email reminder only outside configured production", () => {
