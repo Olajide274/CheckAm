@@ -7,7 +7,7 @@ Status key: CURRENT, TODO, BLOCKED, DONE
 ## Step 0: Repo and tooling (DONE)
 Done when: README explains the project; folders exist; docker-compose runs PostgreSQL and Redis; an empty Next.js app and an empty ASP.NET Core solution (four layered projects plus a test project) both build; a GitHub Actions workflow builds and tests both apps on every pull request; .editorconfig and .gitignore are in place.
 
-## Step 1: Landing page deployment (TODO)
+## Step 1: Landing page deployment (DONE)
 Done when: a fast, mobile-first landing page with the CheckAm logo; a "Check a phone before you buy" input that validates IMEI format only; a waitlist form saving to PostgreSQL; a "Get the full report, N500" button that only records clicks; a one-question sign-up ("which feature would you use most?"); basic analytics events; deployed.
 Paused for the `step-seller-proof` branch by user authorization; deployment completion remains to be confirmed.
 
@@ -36,7 +36,7 @@ Done when: the public check endpoint and page return only the allowed statuses; 
 ## Step 6: Admin, proof, and disputes (TODO)
 Done when: admin review queue; "Under review" state; dispute workflow with an audit log.
 
-## Step 7: Paid report and Seller Proof (TODO)
+## Step 7: Paid report and Seller Proof (DONE)
 Done when: the free IMEI result states that format/Luhn checks do not identify the model or indicate user reports and links to the ₦500 report; successful payment unlocks the TAC brand/model result, the Bill of Sale generator, and Seller Proof controls; low-quality TAC rows with an empty model or a model equal to its brand are presented as brand-only, with recognised brand aliases used to avoid overstating seller-description matches; a paid buyer can create, copy, and share a unique Seller Proof request link; the seller can submit one receipt/device photo without collecting a phone number; the payment-gated report shows the response time and submitted photo only for the successful payment the proof belongs to; uploads are decoded, rotated, stripped of metadata, resized to at most 1600 pixels, and re-encoded as JPEG at quality 80 with a 2 MB cap; attachment data and MIME types are deleted 30 days after response; every result includes the required disclaimer; and authorization, upload-validation, retention, feature-flag, payment-gating, TAC honesty, and UI tests pass.
 
 Authorized launch-readiness work within Step 7: make first-use schema upgrades idempotent for older databases, enforce Paystack key-mode safety while keeping payments off by default in production, add aggregate-only payment summaries, and document production launch checks. This authorization does not change any roadmap step status.
